@@ -28,8 +28,10 @@ export async function GET(req: Request) {
   }
 
   // 預設導回 Join 頁並攜帶 token（若存在）
-  const target = next
-    ? next
+  // SECURITY: next 必須是相對路徑（防 open redirect）
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+  const target = safeNext
+    ? safeNext
     : token
       ? `/join?token=${encodeURIComponent(token)}`
       : "/auth/join";

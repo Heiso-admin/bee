@@ -5,6 +5,7 @@ import TwoFactorEmail from "@bee/core/emails/2fa";
 import { db } from "@bee/core/lib/db";
 import { user2faCode } from "@bee/core/lib/db/schema";
 import { sendEmail } from "@bee/core/lib/email";
+import { consumeRateLimit } from "@bee/core/lib/rate-limit";
 import { and, eq, gt, lt } from "drizzle-orm";
 import { getAccountByEmail, getMember } from "./user.service";
 
@@ -32,6 +33,15 @@ function generateOTPCode(): string {
  */
 export async function generateOTP(email: string): Promise<OTPGenerationResult> {
   try {
+    // SECURITY: rate limit OTP requests per email (5 / 15 min)
+    const { allowed, retryAfter } = consumeRateLimit(`otp:${email}`, 5, 15 * 60 * 1000);
+    if (!allowed) {
+      return {
+        success: false,
+        message: `Too many OTP requests. Try again in ${retryAfter}s.`,
+      };
+    }
+
     const account = await getAccountByEmail(email);
     if (!account) {
       return {

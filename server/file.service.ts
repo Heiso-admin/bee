@@ -60,6 +60,17 @@ export async function saveFile(file: UploadedFile) {
     return Response.json({ error: "Invalid path tenant prefix" }, { status: 400 });
   }
 
+  // SECURITY: server-side dangerous extension blocklist（client 驗證可被繞過）
+  const DANGEROUS_EXTENSIONS = new Set([
+    "exe", "scr", "bat", "cmd", "ps1", "vbs",
+    "php", "phtml", "jsp", "asp", "aspx",
+    "jar", "msi", "dll", "com",
+  ]);
+  const lowerExt = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (DANGEROUS_EXTENSIONS.has(lowerExt)) {
+    throw new Error(`File extension .${lowerExt} is not allowed`);
+  }
+
   // Dedup:同 hash 已存在(active)就直接返回,不重複入 row
   // (cell DB 單 tenant,不需要 tenant_id 條件)
   if (file.hash) {

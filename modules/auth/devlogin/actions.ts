@@ -127,7 +127,7 @@ export async function sendDevOTP(email: string): Promise<{
       }),
     });
 
-    console.log(`[DevLogin] OTP sent to ${email}: ${code}`); // Dev convenience log
+    console.log(`[DevLogin] OTP sent to ${email}`); // 不記 plaintext code
 
     return {
       success: true,

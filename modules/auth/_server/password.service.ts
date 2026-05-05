@@ -6,6 +6,7 @@ import { userPasswordReset, accounts } from "@bee/core/lib/db/schema";
 import { sendForgotPasswordEmail } from "@bee/core/lib/email";
 import { hashPassword } from "@bee/core/lib/hash";
 import { generateId } from "@bee/core/lib/id-generator";
+import { consumeRateLimit } from "@bee/core/lib/rate-limit";
 import { eq } from "drizzle-orm";
 import { getAccountByEmail } from "./user.service";
 
@@ -28,6 +29,12 @@ async function updatePassword(
  * Request password reset: generate token, persist, and send reset email
  */
 export async function requestPasswordReset(email: string) {
+  // SECURITY: rate limit password reset requests per email (5 / 15 min)
+  const { allowed } = consumeRateLimit(`pwd-reset:${email}`, 5, 15 * 60 * 1000);
+  if (!allowed) {
+    return { ok: true }; // 不告知 attacker 被限流（防 email enumeration）
+  }
+
   const account = await getAccountByEmail(email);
 
   if (!account) {
