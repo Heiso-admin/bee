@@ -105,9 +105,17 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
       }
     },
     async jwt({ token, user, account, trigger, session: updateData }) {
-      // Invalidate legacy tokens (missing dev field)
+      // Migrate legacy tokens without forcing re-login
       if (!user && token.dev === undefined) {
-        return {};
+        // Old token had `staff` field — carry over to `dev`
+        if ((token as any).staff !== undefined) {
+          token.dev = (token as any).staff;
+          delete (token as any).staff;
+        } else {
+          // Empty / unknown — derive from email
+          const email = (token as any).email as string | undefined;
+          token.dev = email ? ALLOWED_DEV_EMAILS.includes(email) : false;
+        }
       }
 
       // Handle session update trigger (from unstable_update)
