@@ -12,6 +12,7 @@ export default function TwoStepLogin() {
   const params = useSearchParams();
   const email = params.get("email") || "";
   const codeFromLink = params.get("code") || "";
+  const mode = params.get("mode") === "dev" ? "dev" : "regular";
   const [error, setError] = useState<string>("");
 
   // 帶 code 來的（magic link）— 不重發，直接交給 form 自動驗證
@@ -19,20 +20,23 @@ export default function TwoStepLogin() {
   useEffect(() => {
     if (!email || codeFromLink) return;
     const send = async () => {
-      const result = await generateOTP(email);
+      const result = await generateOTP(
+        email,
+        mode === "dev" ? { mode: "dev" } : undefined,
+      );
       if (!result.success) {
         setError(t(`error.${result.message}`));
       }
     };
     send();
-  }, [email, codeFromLink, t]);
+  }, [email, codeFromLink, mode, t]);
 
   const handleLoginSuccess = () => {
     router.push("/portal");
   };
 
   const backToLogin = () => {
-    router.push(`/login`);
+    router.push(mode === "dev" ? "/auth/devlogin" : "/login");
   };
 
   return (
@@ -45,6 +49,8 @@ export default function TwoStepLogin() {
       handleLoginSuccess={handleLoginSuccess}
       initialCode={codeFromLink}
       autoVerify={!!codeFromLink}
+      mode={mode}
+      extraSignInParams={mode === "dev" ? { isDevLogin: "true" } : undefined}
     />
   );
 }

@@ -20,7 +20,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { generateOTP, verifyOTP } from "../_server/otp.service";
+import { generateOTP, type OTPMode, verifyOTP } from "../_server/otp.service";
 import AuthRedirectHint from "./authRedirectHint";
 import Header from "./header";
 import { type LoginStep, LoginStepEnum } from "./loginForm";
@@ -34,8 +34,8 @@ interface OTPLoginFormProps {
   handleLoginSuccess: () => void;
   /** Pass additional credentials to signIn (e.g., isDevLogin for admin access) */
   extraSignInParams?: Record<string, string>;
-  /** Custom verify function (e.g., verifyDevOTP for devlogin) */
-  verifyFn?: (email: string, code: string) => Promise<{ success: boolean; message?: string; accountId?: string }>;
+  /** OTP flow mode — "dev" 跳過 membership check 限 ALLOWED_DEV_EMAILS */
+  mode?: OTPMode;
   /** 預填的驗證碼（例：從 magic link URL 來的） */
   initialCode?: string;
   /** 進來自動觸發 verify（搭配 initialCode，magic link 用） */
@@ -51,10 +51,11 @@ export default function OTPLoginForm({
   setError,
   handleLoginSuccess,
   extraSignInParams,
-  verifyFn,
+  mode = "regular",
   initialCode = "",
   autoVerify = false,
 }: OTPLoginFormProps) {
+  const otpOpts = mode === "dev" ? { mode: "dev" as const } : undefined;
   const t = useTranslations("auth.otp");
   const [userEmail, setUserEmail] = useState(email || "");
   const [isLoading, setIsLoading] = useState(false);
@@ -93,7 +94,7 @@ export default function OTPLoginForm({
     setIsLoading(true);
 
     try {
-      const result = await generateOTP(values.email);
+      const result = await generateOTP(values.email, otpOpts);
 
       if (result.success) {
         setUserEmail(values.email);
@@ -115,13 +116,10 @@ export default function OTPLoginForm({
     setIsLoading(true);
 
     try {
-      const verify = verifyFn ?? verifyOTP;
-      const result = await verify(userEmail, values.code);
+      const result = await verifyOTP(userEmail, values.code, otpOpts);
 
       if (!result.success) {
-        // 兼容兩種 server action 回傳格式（{ message } / { error }）
-        const raw = (result as { message?: string; error?: string }).message
-          ?? (result as { error?: string }).error;
+        const raw = result.message;
         // 如果是短 i18n key（如 'expired'、'invalid'）就走 i18n；否則直接顯示 raw
         if (raw && /^[a-z_]+$/.test(raw)) {
           setError(t(`error.${raw}`));
@@ -175,7 +173,7 @@ export default function OTPLoginForm({
     setIsLoading(true);
 
     try {
-      const result = await generateOTP(userEmail);
+      const result = await generateOTP(userEmail, otpOpts);
       console.log("generateOTP", result);
 
       if (result.success) {

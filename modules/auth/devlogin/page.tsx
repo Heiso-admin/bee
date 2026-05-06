@@ -5,7 +5,7 @@ import { Button } from "@heiso-io/bee/components/ui/button";
 import { Input } from "@heiso-io/bee/components/ui/input";
 import { Label } from "@heiso-io/bee/components/ui/label";
 import { useRouter } from "next/navigation";
-import { sendDevOTP, verifyDevOTP } from "./actions";
+import { generateOTP } from "../_server/otp.service";
 import Header from "../_components/header";
 import OTPLoginForm from "../_components/otpLoginForm";
 
@@ -22,11 +22,11 @@ export default function DevLoginPage() {
         setLoading(true);
         setError('');
 
-        const result = await sendDevOTP(email);
+        const result = await generateOTP(email, { mode: "dev" });
         setLoading(false);
 
         if (!result.success) {
-            setError(result.error || 'Failed to send OTP');
+            setError(result.message || 'Failed to send OTP');
             return;
         }
 
@@ -89,7 +89,7 @@ export default function DevLoginPage() {
                         setError={setError}
                         handleLoginSuccess={handleLoginSuccess}
                         extraSignInParams={{ isDevLogin: "true" }}
-                        verifyFn={verifyDevOTP}
+                        mode="dev"
                     />
                 )}
             </div>
