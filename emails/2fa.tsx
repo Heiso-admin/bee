@@ -68,26 +68,14 @@ export default function TwoFactorEmail({
             </Section>
 
             {magicLink && (
-              <>
-                <Text className="text-[14px] leading-[22px] text-[#666666] text-center">
-                  Or sign in with one click:
-                </Text>
-                <Section className="my-[20px] text-center">
-                  <Button
-                    className="rounded bg-[#FBBF24] px-5 py-3 text-[16px] font-semibold text-black no-underline"
-                    href={magicLink}
-                  >
-                    Sign in to {orgName}
-                  </Button>
-                </Section>
-                <Text className="text-[12px] leading-[20px] text-[#999999] text-center">
-                  Or paste this URL into your browser:
-                  <br />
-                  <Link href={magicLink} className="text-blue-600 break-all no-underline">
-                    {magicLink}
-                  </Link>
-                </Text>
-              </>
+              <Section className="my-[20px] text-center">
+                <Link
+                  href={magicLink}
+                  className="text-[16px] font-semibold text-[#1d4ed8] underline"
+                >
+                  Use one-click sign-in →
+                </Link>
+              </Section>
             )}
 
             <Hr className="mx-0 my-[24px] w-full border border-solid border-[#e6ebf1]" />
