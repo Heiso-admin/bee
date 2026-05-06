@@ -111,8 +111,8 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
       }
     },
     async jwt({ token, user, account, trigger, session: updateData }) {
-      // Invalidate legacy tokens (missing kind field)
-      if (!user && (token as any).kind === undefined && (token as any).staff === undefined) {
+      // Invalidate legacy tokens (missing kind field — pre alpha.23)
+      if (!user && (token as any).kind === undefined) {
         return {};
       }
 
