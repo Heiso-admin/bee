@@ -2,7 +2,7 @@
 
 import { settings } from "@heiso-io/bee/config/settings";
 import { db } from "@heiso-io/bee/lib/db";
-import { accounts } from "@heiso-io/bee/lib/db/schema";
+import { members } from "@heiso-io/bee/lib/db/schema";
 import { sendApprovedEmail, sendInviteUserEmail } from "@heiso-io/bee/lib/email";
 import { generateInviteToken } from "@heiso-io/bee/lib/id-generator";
 import { auth } from "@heiso-io/bee/modules/auth/auth.config";
@@ -12,12 +12,12 @@ import { MemberStatus, type Member } from "../types";
 
 /**
  * 取得團隊所有成員
- * 使用 accounts 表
+ * 使用 members 表
  */
 async function getTeamMembers(): Promise<Member[]> {
 
-  // 統一從 accounts 表取得成員資格
-  const accountList = await db.query.accounts.findMany({
+  // 統一從 members 表取得成員資格
+  const accountList = await db.query.members.findMany({
     with: {
       customRole: true,
     },
@@ -25,44 +25,44 @@ async function getTeamMembers(): Promise<Member[]> {
     orderBy: (t, { asc }) => [asc(t.createdAt)],
   });
 
-  return accountList.map(account => ({
-    id: account.id,
-    accountId: account.id,
-    roleId: account.roleId,
-    role: account.role as any,
-    status: account.status as any,
-    inviteToken: account.inviteToken,
-    inviteExpiredAt: account.inviteExpiredAt,
-    createdAt: account.createdAt,
-    updatedAt: account.updatedAt,
-    deletedAt: account.deletedAt,
-    account: {
-      id: account.id,
-      email: account.email,
-      name: account.name,
-      avatar: account.avatar,
-      active: account.active,
-      lastLoginAt: account.lastLoginAt,
+  return accountList.map(member => ({
+    id: member.id,
+    memberId: member.id,
+    roleId: member.roleId,
+    role: member.role as any,
+    status: member.status as any,
+    inviteToken: member.inviteToken,
+    inviteExpiredAt: member.inviteExpiredAt,
+    createdAt: member.createdAt,
+    updatedAt: member.updatedAt,
+    deletedAt: member.deletedAt,
+    profile: {
+      id: member.id,
+      email: member.email,
+      name: member.name,
+      avatar: member.avatar,
+      active: member.active,
+      lastLoginAt: member.lastLoginAt,
     } as any,
     // @ts-ignore - customRole 與 role 名稱衝突
-    customRole: account.customRole ?? null,
+    customRole: member.customRole ?? null,
   })) as Member[];
 }
 
 /**
  * 邀請新成員
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function invite({
   email,
   name,
   roleId,
-  accountId: providedAccountId,
+  memberId: providedAccountId,
 }: {
   email?: string;
   name?: string;
   roleId?: string | null;
-  accountId?: string;
+  memberId?: string;
 }) {
   const inviteToken = generateInviteToken();
   const inviteExpiredAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
@@ -71,26 +71,26 @@ async function invite({
     throw new Error("EMAIL_OR_ACCOUNT_ID_REQUIRED");
   }
 
-  // 如果提供了 accountId，使用它；否則用 email 查找
-  let accountId = providedAccountId;
-  if (!accountId && email) {
-    const existingAccount = await db.query.accounts.findFirst({
+  // 如果提供了 memberId，使用它；否則用 email 查找
+  let memberId = providedAccountId;
+  if (!memberId && email) {
+    const existingAccount = await db.query.members.findFirst({
       where: (t, { eq }) => eq(t.email, email),
     });
-    accountId = existingAccount?.id;
+    memberId = existingAccount?.id;
   }
 
-  if (accountId) {
+  if (memberId) {
     // 已存在的帳號
-    const existingAccount = await db.query.accounts.findFirst({
-      where: (t, { eq }) => eq(t.id, accountId as string),
+    const existingAccount = await db.query.members.findFirst({
+      where: (t, { eq }) => eq(t.id, memberId as string),
     });
 
     if (existingAccount) {
       if (existingAccount.deletedAt) {
         // 如果曾被刪除，則恢復
         await db
-          .update(accounts)
+          .update(members)
           .set({
             status: MemberStatus.Invited,
             roleId: roleId ?? null,
@@ -99,11 +99,11 @@ async function invite({
             deletedAt: null,
             updatedAt: new Date(),
           })
-          .where(eq(accounts.id, existingAccount.id));
+          .where(eq(members.id, existingAccount.id));
       } else if (existingAccount.status === MemberStatus.Suspended) {
         // 如果曾被停用，則恢復為邀請狀態
         await db
-          .update(accounts)
+          .update(members)
           .set({
             status: MemberStatus.Invited,
             roleId: roleId ?? null,
@@ -111,7 +111,7 @@ async function invite({
             inviteExpiredAt,
             updatedAt: new Date(),
           })
-          .where(eq(accounts.id, existingAccount.id));
+          .where(eq(members.id, existingAccount.id));
       } else {
         throw new Error("MEMBER_EXISTS");
       }
@@ -120,7 +120,7 @@ async function invite({
         await sendInvite({ email, inviteToken, isOwner: false });
       }
       revalidateTag(`membership:${existingAccount.id}`, "default");
-      revalidatePath("/portal/core/account/team", "page");
+      revalidatePath("/portal/account/team", "page");
       return existingAccount;
     }
   }
@@ -133,7 +133,7 @@ async function invite({
   const randomPassword = await hashPassword(generateId(undefined, 32));
 
   const [created] = await db
-    .insert(accounts)
+    .insert(members)
     .values({
       email,
       name: name ?? email.split("@")[0],
@@ -149,13 +149,13 @@ async function invite({
 
   await sendInvite({ email, inviteToken, isOwner: false });
   revalidateTag(`membership:${created.id}`, "default");
-  revalidatePath("/portal/core/account/team", "page");
+  revalidatePath("/portal/account/team", "page");
   return created;
 }
 
 /**
  * 更新成員資料
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function updateMember({
   id,
@@ -169,18 +169,18 @@ async function updateMember({
   };
 }) {
 
-  const accountUpdates: Partial<typeof accounts.$inferInsert> = {
+  const memberUpdates: Partial<typeof members.$inferInsert> = {
     ...data,
     updatedAt: new Date(),
   };
 
   const result = await db
-    .update(accounts)
-    .set(accountUpdates)
-    .where(eq(accounts.id, id));
+    .update(members)
+    .set(memberUpdates)
+    .where(eq(members.id, id));
 
   revalidateTag(`membership:${id}`, "default");
-  revalidatePath("/portal/core/account/team", "page");
+  revalidatePath("/portal/account/team", "page");
   return result;
 }
 
@@ -220,72 +220,72 @@ async function sendApproved({ email }: { email: string }) {
 
 /**
  * 重寄邀請
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function resendInvite(id: string) {
   const inviteToken = generateInviteToken();
   const inviteExpiredAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq, isNull }) => and(eq(t.id, id), isNull(t.deletedAt)),
   });
 
-  if (!account?.email) {
+  if (!member?.email) {
     throw new Error("Account not found");
   }
 
   await db
-    .update(accounts)
+    .update(members)
     .set({
       inviteToken,
       inviteExpiredAt,
       updatedAt: new Date(),
     })
-    .where(eq(accounts.id, id));
+    .where(eq(members.id, id));
 
   const result = await sendInvite({
-    email: account.email,
+    email: member.email,
     inviteToken,
-    isOwner: account.role === 'owner',
+    isOwner: member.role === 'owner',
   });
 
-  revalidatePath("/portal/core/account/team", "page");
+  revalidatePath("/portal/account/team", "page");
   return result;
 }
 
 /**
  * 撤銷邀請
- * 統一使用 accounts 表（軟刪除）
+ * 統一使用 members 表（軟刪除）
  */
 async function revokeInvite(id: string) {
 
   await db
-    .update(accounts)
+    .update(members)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(eq(accounts.id, id));
+    .where(eq(members.id, id));
 
   revalidateTag(`membership:${id}`, "default");
-  revalidatePath("/portal/core/account/team", "page");
+  revalidatePath("/portal/account/team", "page");
 }
 
 /**
  * 離開團隊
- * 統一使用 accounts 表（軟刪除）
+ * 統一使用 members 表（軟刪除）
  */
 async function leaveTeam(id: string) {
 
   await db
-    .update(accounts)
+    .update(members)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(eq(accounts.id, id));
+    .where(eq(members.id, id));
 
   revalidateTag(`membership:${id}`, "default");
-  revalidatePath("/portal/core/account/team", "page");
+  revalidatePath("/portal/account/team", "page");
 }
 
 /**
  * 新增成員（直接啟用，不需要邀請流程）
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function addMember({
   email,
@@ -298,7 +298,7 @@ async function addMember({
 }) {
   const { hashPassword } = await import("@heiso-io/bee/lib/hash");
 
-  const existingAccount = await db.query.accounts.findFirst({
+  const existingAccount = await db.query.members.findFirst({
     where: (t, { eq }) => eq(t.email, email),
   });
 
@@ -316,7 +316,7 @@ async function addMember({
   if (existingAccount) {
     // 恢復已刪除的帳號
     const [updated] = await db
-      .update(accounts)
+      .update(members)
       .set({
         password: hashedPassword,
         roleId,
@@ -326,16 +326,16 @@ async function addMember({
         deletedAt: null,
         updatedAt: new Date(),
       })
-      .where(eq(accounts.id, existingAccount.id))
+      .where(eq(members.id, existingAccount.id))
       .returning();
 
     revalidateTag(`membership:${existingAccount.id}`, "default");
-    revalidatePath("/portal/core/account/team", "page");
+    revalidatePath("/portal/account/team", "page");
     return { member: updated };
   }
 
-  const [account] = await db
-    .insert(accounts)
+  const [newMember] = await db
+    .insert(members)
     .values({
       email,
       name: displayName,
@@ -347,14 +347,14 @@ async function addMember({
     })
     .returning();
 
-  revalidateTag(`membership:${account.id}`, "default");
-  revalidatePath("/portal/core/account/team", "page");
-  return { member: account };
+  revalidateTag(`membership:${newMember.id}`, "default");
+  revalidatePath("/portal/account/team", "page");
+  return { member: newMember };
 }
 
 /**
  * 轉移擁有權
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function transferOwnership({
   newOwnerId,
@@ -369,7 +369,7 @@ async function transferOwnership({
   }
 
   // 查找當前擁有者
-  const currentOwnerAccount = await db.query.accounts.findFirst({
+  const currentOwnerAccount = await db.query.members.findFirst({
     where: (t, { eq, and }) =>
       and(
         eq(t.id, currentOwnerId),
@@ -383,7 +383,7 @@ async function transferOwnership({
   }
 
   // 查找新擁有者
-  const newOwnerAccount = await db.query.accounts.findFirst({
+  const newOwnerAccount = await db.query.members.findFirst({
     where: (t, { eq, and }) =>
       and(eq(t.id, newOwnerId), eq(t.status, "active")),
   });
@@ -395,35 +395,35 @@ async function transferOwnership({
   await db.transaction(async (tx) => {
     // 設定新擁有者
     await tx
-      .update(accounts)
+      .update(members)
       .set({
         role: 'owner',
         roleId: null,
         updatedAt: new Date(),
       })
-      .where(eq(accounts.id, newOwnerId));
+      .where(eq(members.id, newOwnerId));
 
     // 移除前擁有者權限（降為 member）
     await tx
-      .update(accounts)
+      .update(members)
       .set({
         role: 'member',
         roleId: null,
         updatedAt: new Date(),
       })
-      .where(eq(accounts.id, currentOwnerId));
+      .where(eq(members.id, currentOwnerId));
   });
 
   revalidateTag(`membership:${newOwnerId}`, "default");
   revalidateTag(`membership:${currentOwnerId}`, "default");
-  revalidatePath("/portal/core/account/team");
+  revalidatePath("/portal/account/team");
 
   return { success: true };
 }
 
 /**
  * 重設成員密碼
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function resetMemberPassword({
   actorMemberId,
@@ -442,7 +442,7 @@ async function resetMemberPassword({
   const { hashPassword } = await import("@heiso-io/bee/lib/hash");
 
   // 驗證操作者身份
-  const actor = await db.query.accounts.findFirst({
+  const actor = await db.query.members.findFirst({
     where: (t, { eq }) => eq(t.id, actorMemberId),
   });
 
@@ -457,7 +457,7 @@ async function resetMemberPassword({
   }
 
   // 取得目標帳號
-  const target = await db.query.accounts.findFirst({
+  const target = await db.query.members.findFirst({
     where: (t, { eq }) => eq(t.id, targetMemberId),
   });
 
@@ -468,13 +468,13 @@ async function resetMemberPassword({
   // 更新密碼
   const hashedPassword = await hashPassword(newPassword);
   await db
-    .update(accounts)
+    .update(members)
     .set({
       password: hashedPassword,
       mustChangePassword: true,
       updatedAt: new Date(),
     })
-    .where(eq(accounts.id, targetMemberId));
+    .where(eq(members.id, targetMemberId));
 
   return { success: true };
 }

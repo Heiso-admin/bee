@@ -45,6 +45,7 @@ const createApiKeySchema = z.object({
     .string()
     .min(1, "Name is required")
     .max(100, "Name must be less than 100 characters"),
+  roleId: z.string().min(1, "Role is required"),
   expiresAt: z.string().optional(),
   rateLimitPlan: z.string(),
   rateLimit: z
@@ -61,18 +62,19 @@ interface CreateApiKeyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (apiKey: TPublicApiKey) => void;
+  availableRoles: { id: string; name: string }[];
 }
 
 export function CreateApiKeyDialog({
   open,
   onOpenChange,
   onSuccess,
+  availableRoles,
 }: CreateApiKeyDialogProps) {
   const t = useTranslations("apiKeys");
   const [isPending, startTransition] = useTransition();
   const [createdApiKey, setCreatedApiKey] = useState<{
     key: string;
-    // keyPrefix: string;
     apiKey: TPublicApiKey;
   } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -82,6 +84,7 @@ export function CreateApiKeyDialog({
     resolver: zodResolver(createApiKeySchema),
     defaultValues: {
       name: "",
+      roleId: availableRoles[0]?.id ?? "",
       expiresAt: "1.5_years",
       rateLimitPlan: "standard",
       rateLimit: {
@@ -112,9 +115,8 @@ export function CreateApiKeyDialog({
 
         const result = await createApiKey({
           name: data.name,
-          description: null,
+          roleId: data.roleId,
           expiresAt: expiresAtDate,
-          isActive: true,
           rateLimit,
         });
 
@@ -123,10 +125,12 @@ export function CreateApiKeyDialog({
             key: result.apiKey.key,
             apiKey: {
               id: result.apiKey.id,
-              accountId: result.apiKey.accountId,
+              roleId: result.apiKey.roleId,
+              createdByMemberId: result.apiKey.createdByMemberId,
               name: result.apiKey.name,
               truncatedKey: result.apiKey.truncatedKey ?? result.apiKey.keyPrefix,
-              rateLimit: result.apiKey.rateLimit,
+              rateLimitRequests: result.apiKey.rateLimitRequests,
+              rateLimitWindowSeconds: result.apiKey.rateLimitWindowSeconds,
               expiresAt: result.apiKey.expiresAt,
               createdAt: result.apiKey.createdAt,
               updatedAt: result.apiKey.updatedAt,
@@ -193,6 +197,37 @@ export function CreateApiKeyDialog({
                       <FormControl>
                         <Input placeholder={t("name_placeholder")} {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="roleId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availableRoles.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        API key 繼承此 role 的 permissions
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

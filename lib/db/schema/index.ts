@@ -1,8 +1,8 @@
 // user & authorization
 export * from "./auth";
 
-// accounts table (used by Core mode and CMS Core mode)
-export * from "./auth/accounts";
+// members table (used by Core mode and CMS Core mode)
+export * from "./auth/members";
 
 // features
 export * from "./features";

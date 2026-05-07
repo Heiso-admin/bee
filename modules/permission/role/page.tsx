@@ -4,7 +4,7 @@ import { RoleList } from "./_components/role-list";
 import { getMenus } from "./_server/menu.service";
 import {
   getPermissions,
-  groupPermissionsByMenu,
+  groupPermissionsByResource,
 } from "./_server/permission.service";
 import { getRoles } from "./_server/role.service";
 
@@ -27,6 +27,6 @@ async function RoleManagement() {
     getPermissions(),
   ]);
 
-  const permissionGroups = await groupPermissionsByMenu(menu, permissions);
+  const permissionGroups = await groupPermissionsByResource(permissions);
   return <RoleList data={roles} menus={menu} permissions={permissionGroups} />;
 }

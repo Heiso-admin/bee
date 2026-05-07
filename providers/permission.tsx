@@ -42,18 +42,17 @@ export const PermissionProvider = ({
   children: React.ReactNode;
 }) => {
   const [role, setRole] = useState<string | null>(null);
-  const [fullAccess, setFullAccess] = useState<boolean>(false);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
   const [permissions, setPermissions] = useState<
     UserPermission["permissions"] | null
   >(null);
 
   const fetchPermissions = useCallback(async () => {
     try {
-      const { role, fullAccess, permissions } = await getUserPermissions();
-      console.log("role: ", role);
-      setRole(role);
-      setFullAccess(fullAccess);
-      setPermissions(permissions);
+      const result = await getUserPermissions();
+      setRole(result.role);
+      setIsOwner(("isOwner" in result && (result as any).isOwner) ?? false);
+      setPermissions(result.permissions);
     } catch (error) {
       console.error("Failed to fetch permissions:", error);
       setPermissions(null);
@@ -68,14 +67,14 @@ export const PermissionProvider = ({
     async ({
       permissions: permissionsList,
     }: PermissionCheck): Promise<boolean[]> => {
-      if (fullAccess === true) return Array(permissionsList.length).fill(true);
+      if (isOwner === true) return Array(permissionsList.length).fill(true);
       if (!permissions) return Array(permissionsList.length).fill(false);
 
       return permissionsList.map(({ resource, action }) =>
         permissions.some((p) => p.resource === resource && p.action === action),
       );
     },
-    [fullAccess, permissions],
+    [isOwner, permissions],
   );
 
   return (

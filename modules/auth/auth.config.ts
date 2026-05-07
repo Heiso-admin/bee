@@ -15,7 +15,6 @@ declare module "next-auth" {
       isOwner: boolean;
       role: string | null;
       customRoleName: string | null;
-      fullAccess: boolean;
     };
   }
   interface JWT {
@@ -24,7 +23,6 @@ declare module "next-auth" {
       status: string | null;
       role: string | null;
       customRoleName: string | null;
-      fullAccess: boolean;
     } | null;
     memberUpdatedAt?: number | null;
   }
@@ -35,7 +33,6 @@ declare module "next-auth" {
       status: string | null;
       role: string | null;
       customRoleName: string | null;
-      fullAccess: boolean;
     } | null;
   }
 }
@@ -47,7 +44,7 @@ class InvalidLoginError extends CredentialsSignin {
 /**
  * Dev 身分名單。由各 host 自己 env 控制（hive 之後集中管）。
  *   ALLOWED_DEV_EMAILS=pm@heiso.io,dev@heiso.io
- * 空 / 沒設 → 沒人能走 /devlogin。
+ * 空 / 沒設 → 沒人能 dev login。
  */
 export const ALLOWED_DEV_EMAILS = (process.env.ALLOWED_DEV_EMAILS ?? "")
   .split(",")
@@ -69,16 +66,16 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           .trim();
         if (!email) return true;
 
-        const { getAccountByEmail } = await import("@heiso-io/bee/lib/accounts/account-adapter");
-        const account_ = await getAccountByEmail(email);
+        const { getMemberByEmail } = await import("@heiso-io/bee/lib/members/member-adapter");
+        const account_ = await getMemberByEmail(email);
         if (!account_) return true;
 
         const { and, eq, isNull } = await import("drizzle-orm");
 
-        // 統一使用 accounts 表（Core 和 APPS 模式皆同）
-        const { accounts } = await import("@heiso-io/bee/lib/db/schema");
+        // 統一使用 members 表（Core 和 APPS 模式皆同）
+        const { members } = await import("@heiso-io/bee/lib/db/schema");
 
-        const existingAccount = await db.query.accounts.findFirst({
+        const existingAccount = await db.query.members.findFirst({
           where: (t, ops) =>
             ops.and(ops.eq(t.id, account_.id), ops.isNull(t.deletedAt)),
           columns: { id: true, status: true, roleId: true },
@@ -87,7 +84,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         // 若帳號狀態為 invited，更新為 active
         if (existingAccount && existingAccount.status === "invited") {
           await db
-            .update(accounts)
+            .update(members)
             .set({
               inviteToken: null,
               inviteExpiredAt: null,
@@ -96,7 +93,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
               updatedAt: new Date(),
             })
             .where(
-              and(eq(accounts.id, existingAccount.id), isNull(accounts.deletedAt)),
+              and(eq(members.id, existingAccount.id), isNull(members.deletedAt)),
             );
 
           const { revalidateTag } = await import("next/cache");
@@ -133,13 +130,13 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         token.member = (user as any).member ?? null;
         token.memberUpdatedAt = Date.now();
 
-        // OAuth login: replace token.sub with Tenant DB account.id
+        // OAuth login: replace token.sub with Tenant DB member.id
         if (account && account.provider !== "credentials") {
           const email = (user.email || "").toString().trim();
           if (email) {
             try {
-              const { getAccountByEmail } = await import("@heiso-io/bee/lib/accounts/account-adapter");
-              const dbAccount = await getAccountByEmail(email);
+              const { getMemberByEmail } = await import("@heiso-io/bee/lib/members/member-adapter");
+              const dbAccount = await getMemberByEmail(email);
               if (dbAccount) {
                 token.sub = dbAccount.id;
                 // Query membership for OAuth user
@@ -151,8 +148,8 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
                   status: membership.status,
                   role: membership.role,
                   customRoleName: membership.customRole ? (membership.customRole as any)[1] : null,
-                  fullAccess: membership.role === 'owner' || !!(membership.customRole && (membership.customRole as any)[2]),
-                } : { status: null, role: null, customRoleName: null, fullAccess: false };
+
+                } : { status: null, role: null, customRoleName: null };
                 token.memberUpdatedAt = Date.now();
               }
             } catch (e) {
@@ -180,20 +177,18 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           isOwner: false,
           role: null,
           customRoleName: null,
-          fullAccess: true,
         };
         return session;
       }
 
       // Read membership from token (no DB query)
-      const memberData = token.member as { status: string | null; role: string | null; customRoleName: string | null; fullAccess: boolean } | null | undefined;
+      const memberData = token.member as { status: string | null; role: string | null; customRoleName: string | null; } | null | undefined;
       if (memberData && 'status' in memberData) {
         session.member = {
           status: memberData.status,
           isOwner: memberData.role === 'owner',
           role: memberData.role,
           customRoleName: memberData.customRoleName,
-          fullAccess: memberData.fullAccess,
         };
       } else {
         // Legacy token fallback
@@ -202,7 +197,6 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           isOwner: false,
           role: null,
           customRoleName: null,
-          fullAccess: false,
         };
       }
 
@@ -235,8 +229,8 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
 
         if (!email) return;
 
-        const { getAccountByEmail } = await import("@heiso-io/bee/lib/accounts/account-adapter");
-        const existingAccount = await getAccountByEmail(email);
+        const { getMemberByEmail } = await import("@heiso-io/bee/lib/members/member-adapter");
+        const existingAccount = await getMemberByEmail(email);
 
         if (!existingAccount) {
           // Core 模式：需要先創建帳號
@@ -247,22 +241,22 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
 
         const { eq } = await import("drizzle-orm");
 
-        // 統一使用 accounts 表（Core 和 APPS 模式皆同）
-        const { accounts } = await import("@heiso-io/bee/lib/db/schema");
+        // 統一使用 members 表（Core 和 APPS 模式皆同）
+        const { members } = await import("@heiso-io/bee/lib/db/schema");
 
         // 查找帳號
-        const account_ = await db.query.accounts.findFirst({
+        const account_ = await db.query.members.findFirst({
           where: (t, ops) => ops.and(ops.eq(t.id, existingAccount.id), ops.isNull(t.deletedAt)),
         });
 
         if (account_) {
           // 更新帳號
           await db
-            .update(accounts)
+            .update(members)
             .set({ updatedAt: new Date(), lastLoginAt: new Date() })
-            .where(eq(accounts.id, account_.id));
+            .where(eq(members.id, account_.id));
         } else {
-          // 這種情況通常不會發生，因為 getAccountByEmail 已經找到帳號
+          // 這種情況通常不會發生，因為 getMemberByEmail 已經找到帳號
           console.warn("[OAuth signIn] Account record not found");
         }
       } catch (err) {
@@ -287,7 +281,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         password: { label: "Password", type: "password" },
         email: { label: "Email" },
         otpVerified: { label: "OTP Verified" },
-        accountId: { label: "Account ID" },
+        memberId: { label: "Account ID" },
         isDevLogin: { label: "Is Dev Login" },
       },
       async authorize(credentials, _req) {
@@ -295,8 +289,8 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         // OTP already verified by verifyDevOTP, trust the result
         if (credentials?.otpVerified === "true") {
           const email = String(credentials?.email || "");
-          const accountId = String(credentials?.accountId || "");
-          if (!email || !accountId) throw new InvalidLoginError();
+          const memberId = String(credentials?.memberId || "");
+          if (!email || !memberId) throw new InvalidLoginError();
 
           const isDevLogin = credentials?.isDevLogin === "true";
           const isAllowedDevEmail = ALLOWED_DEV_EMAILS.includes(email);
@@ -304,7 +298,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           if (isDevLogin && isAllowedDevEmail) {
             // dev: account is in cell DB; kind derived from email in jwt callback
             return {
-              id: accountId,
+              id: memberId,
               name: email.split("@")[0],
               email,
               member: null,
@@ -312,19 +306,18 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           }
 
           // Non-dev OTP login: verify account in Tenant DB
-          const { getAccount } = await import("./_server/user.service");
-          const account = await getAccount(accountId);
-          if (!account || account.email !== email) throw new InvalidLoginError();
+          const { getMember } = await import("./_server/user.service");
+          const member = await getMember(memberId);
+          if (!member || member.email !== email) throw new InvalidLoginError();
 
           return {
-            id: account.id,
-            name: account.name,
-            email: account.email,
+            id: member.id,
+            name: member.name,
+            email: member.email,
             member: {
-              status: (account as any).status ?? null,
-              role: (account as any).role ?? null,
+              status: (member as any).status ?? null,
+              role: (member as any).role ?? null,
               customRoleName: null,
-              fullAccess: (account as any).role === 'owner',
             },
           };
         }
@@ -333,42 +326,40 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         if (!credentials?.username || !credentials?.password) throw new InvalidLoginError();
         const { username, password: pwd } = credentials as { username: string; password: string };
 
-        // dev 帳號禁止 password login (僅走 OTP /devlogin)
+        // dev 帳號禁止 password login (僅走 OTP)
         if (ALLOWED_DEV_EMAILS.includes(username.trim().toLowerCase())) {
           throw new InvalidLoginError();
         }
 
         const {
-          getAccountByEmail,
+          getMemberByEmail,
           verifyPassword: verifyAccountPassword,
-        } = await import("@heiso-io/bee/lib/accounts/account-adapter");
+        } = await import("@heiso-io/bee/lib/members/member-adapter");
 
-        const account = await getAccountByEmail(username);
-        if (!account) throw new InvalidLoginError();
+        const member = await getMemberByEmail(username);
+        if (!member) throw new InvalidLoginError();
 
         const isPasswordValid = await verifyAccountPassword(username, pwd);
         if (!isPasswordValid) throw new InvalidLoginError();
 
         // Query membership info for JWT
-        const memberData = {
-          status: (account as any).status ?? null,
-          role: (account as any).role ?? null,
-          customRoleName: null as string | null,
-          fullAccess: (account as any).role === 'owner',
+        const memberData: { status: string | null; role: string | null; customRoleName: string | null } = {
+          status: (member as any).status ?? null,
+          role: (member as any).role ?? null,
+          customRoleName: null,
         };
 
         // Resolve customRole if roleId exists
-        if ((account as any).roleId) {
+        if ((member as any).roleId) {
           try {
             const { roles } = await import("@heiso-io/bee/lib/db/schema");
             const { eq } = await import("drizzle-orm");
             const customRole = await db.query.roles.findFirst({
-              where: eq(roles.id, (account as any).roleId),
-              columns: { name: true, fullAccess: true },
+              where: eq(roles.id, (member as any).roleId),
+              columns: { name: true },
             });
             if (customRole) {
               memberData.customRoleName = customRole.name;
-              memberData.fullAccess = memberData.fullAccess || customRole.fullAccess;
             }
           } catch (e) {
             console.warn("[authorize] customRole lookup failed:", e);
@@ -376,9 +367,9 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         }
 
         return {
-          id: account.id,
-          name: account.name,
-          email: account.email,
+          id: member.id,
+          name: member.name,
+          email: member.email,
           member: memberData,
         };
       },

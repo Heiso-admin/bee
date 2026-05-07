@@ -148,7 +148,6 @@ export function PermissionCard({
   const handleCreatePermission = async (data: PermissionFormValues) => {
     startCreateTransition(async () => {
       await createPermission({
-        menuId: permissionGroup.id,
         resource: data.resource,
         action: data.action,
       });
@@ -199,7 +198,6 @@ export function PermissionCard({
     if (checked) {
       startCreateTransition(async () => {
         const _created = await createPermission({
-          menuId: permissionGroup.id,
           resource,
           action,
         });
@@ -227,7 +225,6 @@ export function PermissionCard({
         await Promise.all(
           toCreate.map((p) =>
             createPermission({
-              menuId: permissionGroup.id,
               resource: p.resource,
               action: p.action,
             }),

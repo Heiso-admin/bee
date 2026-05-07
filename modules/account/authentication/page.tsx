@@ -1,6 +1,6 @@
 import { auth } from "@heiso-io/bee/modules/auth/auth.config";
 import { redirect } from "next/navigation";
-import { cachedGetAccountByEmail } from "@heiso-io/bee/lib/cache/account";
+import { cachedGetMemberByEmail } from "@heiso-io/bee/lib/cache/member";
 import AuthenticationForm from "./authentication-form";
 
 export default async function AuthenticationPage() {
@@ -10,7 +10,7 @@ export default async function AuthenticationPage() {
         redirect("/auth/login");
     }
 
-    const user = await cachedGetAccountByEmail(session.user.email);
+    const user = await cachedGetMemberByEmail(session.user.email);
 
     const loginMethod = user?.loginMethod || "email";
 

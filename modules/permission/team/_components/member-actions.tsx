@@ -49,7 +49,8 @@ export function MemberActions({
 }) {
   const t = useTranslations("dashboard.permission.message");
   const { data: session } = useSession();
-  const { staff } = useAccount();
+  const { kind } = useAccount();
+  const staff = kind === "dev";
   const { settings } = useSettings();
   const [isRemovePending, startRemoveTransition] = useTransition();
   const [isResendPending, startResendTransition] = useTransition();
@@ -71,15 +72,15 @@ export function MemberActions({
 
   // 檢查當前用戶是否為擁有者
   const currentUserMember = currentMembers.find(
-    (m) => m.accountId === session?.user?.id,
+    (m) => m.memberId === session?.user?.id,
   );
   const isCurrentUserOwner = currentUserMember?.role === 'owner';
   const canTransferTo =
     member.status === MemberStatus.Active &&
-    member.accountId !== session?.user?.id;
+    member.memberId !== session?.user?.id;
   const isUserActive = member.status === MemberStatus.Active;
-  const email = member.account?.email || "";
-  const userName = member.account?.name || email.split("@")[0] || "Unknown";
+  const email = member.profile?.email || "";
+  const userName = member.profile?.name || email.split("@")[0] || "Unknown";
 
   const InvitationExpired =
     member.status === MemberStatus.Invited &&

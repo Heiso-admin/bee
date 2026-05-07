@@ -1,11 +1,5 @@
 import { generateId } from "@heiso-io/bee/lib/id-generator";
-import {
-  index,
-  integer,
-  pgTable,
-  timestamp,
-  varchar,
-} from "drizzle-orm/pg-core";
+import { type AnyPgColumn, foreignKey, index, integer, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import {
   createInsertSchema,
   createSelectSchema,
@@ -22,16 +16,20 @@ export const menus = pgTable(
     title: varchar("title", { length: 100 }).notNull(),
     path: varchar("path", { length: 255 }),
     icon: varchar("icon", { length: 50 }),
-    group: varchar("group", { length: 20 }),
     parentId: varchar("parent_id", { length: 20 }),
-    sortOrder: integer("sort_order").default(0),
+    sortOrder: integer("sort_order").notNull().default(0),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+      name: "menus_parent_id_fk",
+    }).onDelete("set null"),
     index("menus_parent_id_idx").on(table.parentId),
-    index("menus_group_order_idx").on(table.group, table.sortOrder),
+    index("menus_sort_order_idx").on(table.sortOrder),
     index("menus_deleted_at_idx").on(table.deletedAt),
   ],
 );

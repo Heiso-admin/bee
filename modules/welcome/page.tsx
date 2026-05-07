@@ -52,7 +52,7 @@ export default function WelcomePage() {
             <Step n="01" title="Branding" file=".env.local" desc="NEXT_PUBLIC_SITE_NAME · NEXT_PUBLIC_ORGANIZATION · NEXT_PUBLIC_LOGO_URL" />
             <Step n="02" title="Menus" file="config/menus.ts" desc="加 dashboard menu items,對應路徑要存在。" />
             <Step n="03" title="Pages" file="app/portal/(main)/<feature>/page.tsx" desc="每個 menu 對應一個 page,寫你的業務邏輯。" />
-            <Step n="04" title="Translations" file="app/portal/_messages/*.json" desc="補 menu nav 顯示名 + 自訂頁文字。" />
+            <Step n="04" title="Translations" file="app/portal/i18n/*.json" desc="補 menu nav 顯示名 + 自訂頁文字。" />
             <Step n="05" title="Replace this" file="app/portal/(main)/welcome/page.tsx" desc="把 re-export 換成你自己的內容,或從 menus 拿掉。" last />
           </ol>
         </div>

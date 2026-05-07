@@ -1,19 +1,19 @@
 "use server";
 
 import { db } from "@heiso-io/bee/lib/db";
-import { accounts } from "@heiso-io/bee/lib/db/schema";
+import { members } from "@heiso-io/bee/lib/db/schema";
 import { auth } from "@heiso-io/bee/modules/auth/auth.config";
 import { and, eq, isNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 /**
  * 取得當前帳號的成員資格
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function getMembership() {
   const session = await auth();
-  const accountId = session?.user?.id;
+  const memberId = session?.user?.id;
 
-  if (!accountId) {
+  if (!memberId) {
     throw new Error("Unauthorized");
   }
 
@@ -23,7 +23,7 @@ async function getMembership() {
     return { kind: "dev" as const, membership: null };
   }
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
       role: true,
@@ -33,57 +33,59 @@ async function getMembership() {
       customRole: {
         columns: {
           id: true,
-          fullAccess: true,
         },
       },
     },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), eq(t.status, "active"), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), eq(t.status, "active"), isNull(t.deletedAt)),
   });
 
   return {
     kind: "member" as const,
-    membership: account
-      ? { id: account.id, role: account.role, customRole: account.customRole }
+    membership: member
+      ? { id: member.id, role: member.role, customRole: member.customRole }
       : null,
   };
 }
 
 /**
  * 透過邀請 token 取得邀請資訊
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function getInviteToken({ token }: { token: string }) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq, isNull }) =>
       and(eq(t.inviteToken, token), isNull(t.deletedAt)),
   });
 
-  if (!account) return null;
+  if (!member) return null;
 
-  if (!account.inviteExpiredAt || account.inviteExpiredAt < new Date()) {
+  if (!member.inviteExpiredAt || member.inviteExpiredAt < new Date()) {
     return null;
   }
 
   return {
-    id: account.id,
-    accountId: account.id,
-    inviteToken: account.inviteToken,
-    inviteExpiredAt: account.inviteExpiredAt,
-    status: account.status,
-    account,
+    id: member.id,
+    memberId: member.id,
+    inviteToken: member.inviteToken,
+    inviteExpiredAt: member.inviteExpiredAt,
+    status: member.status,
+    profile: {
+      name: member.name,
+      email: member.email,
+    },
   };
 }
 
 /**
  * 加入團隊
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function join(memberId: string) {
 
   const result = await db
-    .update(accounts)
+    .update(members)
     .set({
       inviteToken: null,
       inviteExpiredAt: null,
@@ -91,26 +93,26 @@ async function join(memberId: string) {
       joinedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(and(eq(accounts.id, memberId), isNull(accounts.deletedAt)));
+    .where(and(eq(members.id, memberId), isNull(members.deletedAt)));
 
   return result;
 }
 
 /**
  * 拒絕邀請
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 async function decline(id: string) {
 
   return await db
-    .update(accounts)
+    .update(members)
     .set({
       inviteToken: null,
       inviteExpiredAt: null,
       status: "suspended",
       updatedAt: new Date(),
     })
-    .where(eq(accounts.id, id));
+    .where(eq(members.id, id));
 }
 
 async function removeJoinToken() {
@@ -122,21 +124,21 @@ export { getMembership, getInviteToken, join, decline, removeJoinToken };
 
 /**
  * 更新使用者基本資料（名稱、頭像、密碼）
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 export async function updateBasicProfile({
-  accountId,
+  memberId,
   name,
   avatar,
   password,
 }: {
-  accountId: string;
+  memberId: string;
   name?: string;
   avatar?: string | null;
   password?: string;
 }) {
   const session = await auth();
-  if (!session?.user?.id || session.user.id !== accountId) {
+  if (!session?.user?.id || session.user.id !== memberId) {
     throw new Error("Unauthorized");
   }
 
@@ -151,7 +153,7 @@ export async function updateBasicProfile({
     updates.password = await hashPassword(password.trim());
   }
 
-  await db.update(accounts).set(updates).where(eq(accounts.id, accountId));
+  await db.update(members).set(updates).where(eq(members.id, memberId));
 
   return { ok: true };
 }

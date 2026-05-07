@@ -15,7 +15,7 @@ import {
   createUpdateSchema,
 } from "drizzle-zod";
 import type zod from "zod";
-import { accounts } from "../../auth/accounts";
+import { members } from "../../auth/members";
 import { fileFolders } from "./folders";
 import { fileTagMapping } from "./tags";
 
@@ -67,9 +67,9 @@ export const filesRelations = relations(files, ({ one, many }) => ({
     fields: [files.folderId],
     references: [fileFolders.id],
   }),
-  owner: one(accounts, {
+  owner: one(members, {
     fields: [files.ownerId],
-    references: [accounts.id],
+    references: [members.id],
   }),
   tagMappings: many(fileTagMapping),
 }));

@@ -2,7 +2,7 @@
 
 import { sendInvite } from "@heiso-io/bee/modules/permission/team/_server/team.service";
 import { type Transaction } from "@heiso-io/bee/lib/db";
-import { accounts } from "@heiso-io/bee/lib/db/schema";
+import { members } from "@heiso-io/bee/lib/db/schema";
 import { generateInviteToken } from "@heiso-io/bee/lib/id-generator";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@heiso-io/bee/lib/db";
@@ -13,97 +13,152 @@ import { db } from "@heiso-io/bee/lib/db";
  */
 export async function getAccounts() {
 
-  const result = await db.query.accounts.findMany({
+  const result = await db.query.members.findMany({
     where: (t, { isNull }) => isNull(t.deletedAt),
   });
   return result;
 }
 
 /**
- * 取得成員的登入方式
- * @param accountId - Account ID
+ * 取得成員的登入方式（per-role）。
+ * - owner：全部開（structural bypass）
+ * - 有 custom role：用該 role 的 allow_* flags
+ * - 沒 role：default 寬鬆（magic link + password）
+ *
+ * 給 /auth/login 流程決定下一步用。
  */
-export async function getLoginMethod(accountId: string) {
+export type MemberAuthMethods = {
+  allowMagicLink: boolean;
+  allowPassword: boolean;
+  allowTwoFactor: boolean;
+};
 
-  const account = await db.query.accounts.findFirst({
-    columns: { loginMethod: true },
+const DEFAULT_AUTH_METHODS: MemberAuthMethods = {
+  allowMagicLink: true,
+  allowPassword: true,
+  allowTwoFactor: false,
+};
+
+const OWNER_AUTH_METHODS: MemberAuthMethods = {
+  allowMagicLink: true,
+  allowPassword: true,
+  allowTwoFactor: true,
+};
+
+export async function getMemberAuthMethods(memberId: string): Promise<MemberAuthMethods> {
+  const member = await db.query.members.findFirst({
+    columns: { role: true, roleId: true },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
+    with: {
+      customRole: {
+        columns: {
+          allowMagicLink: true,
+          allowPassword: true,
+          allowTwoFactor: true,
+        },
+      },
+    },
   });
 
-  return account?.loginMethod ?? "email";
+  if (!member) return DEFAULT_AUTH_METHODS;
+  if (member.role === "owner") return OWNER_AUTH_METHODS;
+  if (!member.customRole) return DEFAULT_AUTH_METHODS;
+
+  return {
+    allowMagicLink: member.customRole.allowMagicLink,
+    allowPassword: member.customRole.allowPassword,
+    allowTwoFactor: member.customRole.allowTwoFactor,
+  };
+}
+
+/**
+ * @deprecated Use `getMemberAuthMethods()` instead. Backward-compat shim while
+ * we phase out `members.login_method` column. Returns one of "both" | "email" | "otp"
+ * by collapsing the 3 role flags with precedence 2FA > password > magic-link.
+ */
+export async function getLoginMethod(memberId: string) {
+  const flags = await getMemberAuthMethods(memberId);
+  if (flags.allowTwoFactor) return "both" as const;
+  if (flags.allowPassword) return "email" as const;
+  if (flags.allowMagicLink) return "otp" as const;
+  return "email" as const;
 }
 
 /**
  * 取得成員狀態
- * 統一使用 accounts 表
- * @param accountId - Account ID
+ * 統一使用 members 表
+ * @param memberId - Account ID
  */
-export async function getMemberStatus(accountId: string) {
+export async function getMemberStatus(memberId: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: { status: true },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
-  return account?.status ?? null;
+  return member?.status ?? null;
 }
 
 /**
- * 透過 accountId 取得成員資訊
- * 統一使用 accounts 表
- * @param accountId - Account ID
+ * 透過 memberId 取得成員資訊
+ * 統一使用 members 表
+ * @param memberId - Account ID
  */
-export async function getMember(accountId: string) {
+export async function getMember(memberId: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
+      email: true,
+      name: true,
       status: true,
       roleId: true,
       role: true,
     },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
-  if (!account) return null;
+  if (!member) return null;
 
   return {
-    id: account.id,
-    accountId: account.id,
-    status: account.status,
-    roleId: account.roleId,
-    role: account.role,
+    id: member.id,
+    memberId: member.id,
+    email: member.email,
+    name: member.name,
+    status: member.status,
+    roleId: member.roleId,
+    role: member.role,
   };
 }
 
 /**
- * 透過 accountId 取得成員的邀請 token
- * 統一使用 accounts 表
- * @param accountId - Account ID
+ * 透過 memberId 取得成員的邀請 token
+ * 統一使用 members 表
+ * @param memberId - Account ID
  */
-export async function getMemberInviteToken(accountId: string) {
+export async function getMemberInviteToken(memberId: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: { inviteToken: true },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
-  return account?.inviteToken ?? null;
+  return member?.inviteToken ?? null;
 }
 
 /**
  * 取得帳號資訊
- * @param accountId - Account ID
+ * @param memberId - Account ID
  */
-export async function getAccount(accountId: string) {
+export async function getAccount(memberId: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
-  return account ?? null;
+  return member ?? null;
 }
 
 /**
@@ -111,44 +166,44 @@ export async function getAccount(accountId: string) {
  * @param email - Email
  */
 export async function resendInviteByEmail(email: string) {
-  const account = await getAccountByEmail(email);
-  if (!account) {
+  const member = await getMemberByEmail(email);
+  if (!member) {
     throw new Error("Account not found");
   }
-  return resendInviteByAccountId(account.id);
+  return resendInviteByAccountId(member.id);
 }
 
 /**
  * 重寄邀請 email 給成員
- * 統一使用 accounts 表
- * @param accountId - Account ID
+ * 統一使用 members 表
+ * @param memberId - Account ID
  */
-export async function resendInviteByAccountId(accountId: string) {
+export async function resendInviteByAccountId(memberId: string) {
   const inviteToken = generateInviteToken();
   const inviteExpiredAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
-  if (!account) {
+  if (!member) {
     throw new Error("Account not found");
   }
 
   await db
-    .update(accounts)
+    .update(members)
     .set({
       inviteToken,
       inviteExpiredAt,
       updatedAt: new Date(),
     })
-    .where(eq(accounts.id, accountId));
+    .where(eq(members.id, memberId));
 
   const result = await sendInvite({
-    email: account.email,
+    email: member.email,
     inviteToken,
-    isOwner: account.role === "owner",
+    isOwner: member.role === "owner",
   });
 
   return result;
@@ -157,79 +212,79 @@ export async function resendInviteByAccountId(accountId: string) {
 /**
  * 確保帳號有有效的邀請 token（不發送 email）
  * - 若 token 遺失或過期，刷新 token
- * 統一使用 accounts 表
- * @param accountId - Account ID
+ * 統一使用 members 表
+ * @param memberId - Account ID
  */
-export async function ensureInviteTokenSilently(accountId: string) {
+export async function ensureInviteTokenSilently(memberId: string) {
   const now = Date.now();
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
-  if (!account) return null;
+  if (!member) return null;
 
   const needsNewToken =
-    !account.inviteToken ||
-    !account.inviteExpiredAt ||
-    account.inviteExpiredAt.getTime() < now;
+    !member.inviteToken ||
+    !member.inviteExpiredAt ||
+    member.inviteExpiredAt.getTime() < now;
 
   if (needsNewToken) {
     const inviteToken = generateInviteToken();
     const inviteExpiredAt = new Date(now + 1000 * 60 * 60 * 24 * 7);
 
     const [updated] = await db
-      .update(accounts)
+      .update(members)
       .set({
         inviteToken,
         inviteExpiredAt,
         updatedAt: new Date(),
       })
-      .where(eq(accounts.id, accountId))
-      .returning({ inviteToken: accounts.inviteToken });
+      .where(eq(members.id, memberId))
+      .returning({ inviteToken: members.inviteToken });
 
     return updated?.inviteToken ?? null;
   }
 
-  return account.inviteToken;
+  return member.inviteToken;
 }
 
 /**
  * 首次登入：設定帳號狀態為 active
- * 統一使用 accounts 表
+ * 統一使用 members 表
  *
  * 若租戶 DB 中查無帳號（例如透過 Hive CLI 建立的帳號），
  * 會從 cell DB 拉取帳號資訊並 INSERT 至租戶 DB。
  *
- * @param accountId - Account ID
+ * @param memberId - Account ID
  * @param tx - 可選的 transaction
  */
 export async function ensureMemberOnFirstLogin(
-  accountId: string,
+  memberId: string,
   tx?: Transaction,
 ) {
   const d = tx ?? db;
 
-  let account = await d.query.accounts.findFirst({
+  let member = await d.query.members.findFirst({
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
-  if (!account) {
+  if (!member) {
     return null;
   }
 
-  const existingOwner = await d.query.accounts.findFirst({
+  const existingOwner = await d.query.members.findFirst({
     where: (t, { eq, isNull }) =>
       and(eq(t.role, "owner"), isNull(t.deletedAt)),
     columns: { id: true },
   });
 
   const shouldBeOwner = !existingOwner;
-  let assignedRoleId = account.roleId;
+  let assignedRoleId = member.roleId;
 
-  if ((shouldBeOwner || account.role === "owner") && !assignedRoleId) {
+  if ((shouldBeOwner || member.role === "owner") && !assignedRoleId) {
     const adminRole = await d.query.roles.findFirst({
       where: (t, { eq, isNull }) =>
         and(eq(t.name, "Admin"), isNull(t.deletedAt)),
@@ -241,19 +296,19 @@ export async function ensureMemberOnFirstLogin(
   }
 
   const [updated] = await d
-    .update(accounts)
+    .update(members)
     .set({
       roleId: assignedRoleId,
       status: "active",
-      role: account.role === "owner" || shouldBeOwner ? "owner" : account.role,
+      role: member.role === "owner" || shouldBeOwner ? "owner" : member.role,
       joinedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(accounts.id, accountId))
+    .where(eq(members.id, memberId))
     .returning({
-      id: accounts.id,
-      status: accounts.status,
-      role: accounts.role,
+      id: members.id,
+      status: members.status,
+      role: members.role,
     });
 
   if (updated) {
@@ -263,17 +318,17 @@ export async function ensureMemberOnFirstLogin(
     } catch {}
   }
   return updated
-    ? { ...updated, accountId: updated.id }
+    ? { ...updated, memberId: updated.id }
     : null;
 }
 
 /**
  * 檢查當前 tenant 是否有 owner
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 export async function checkTenantHasOwner() {
 
-  const owner = await db.query.accounts.findFirst({
+  const owner = await db.query.members.findFirst({
     where: (t, { eq, isNull }) =>
       and(eq(t.role, "owner"), isNull(t.deletedAt)),
     columns: { id: true },
@@ -284,33 +339,33 @@ export async function checkTenantHasOwner() {
 /**
  * 透過 email 取得帳號
  */
-export async function getAccountByEmail(email: string) {
+export async function getMemberByEmail(email: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq }) => eq(t.email, email),
   });
-  return account ?? null;
+  return member ?? null;
 }
 
 /**
  * 透過 email 取得帳號 (包含密碼)
  */
 export async function getAccountWithPasswordByEmail(email: string) {
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     where: (t, { eq, isNull }) =>
       and(eq(t.email, email), isNull(t.deletedAt)),
   });
 
-  if (!account) return null;
+  if (!member) return null;
 
   return {
-    id: account.id,
-    email: account.email,
-    name: account.name,
-    password: account.password,
-    active: account.active,
-    avatar: account.avatar,
-    lastLoginAt: account.lastLoginAt,
+    id: member.id,
+    email: member.email,
+    name: member.name,
+    password: member.password,
+    active: member.active,
+    avatar: member.avatar,
+    lastLoginAt: member.lastLoginAt,
   };
 }
 

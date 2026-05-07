@@ -197,7 +197,7 @@ const avatarOptions = {
 };
 
 export default function AvatarCreatorDialog() {
-  const t = useTranslations("account.avatar");
+  const t = useTranslations("member.avatar");
   const [avatarType, setAvatarType] = useState<"avataaars" | "custom">(
     "avataaars",
   );

@@ -4,7 +4,7 @@ import { db } from "@heiso-io/bee/lib/db";
 
 interface UserPermission {
   role: string;
-  fullAccess: boolean;
+  isOwner: boolean;
   permissions?: {
     id: string;
     resource: string;
@@ -14,11 +14,11 @@ interface UserPermission {
 
 /**
  * 取得使用者權限
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
-async function findUserPermissions(accountId: string): Promise<UserPermission> {
+async function findUserPermissions(memberId: string): Promise<UserPermission> {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
       role: true,
@@ -29,12 +29,11 @@ async function findUserPermissions(accountId: string): Promise<UserPermission> {
         columns: {
           id: true,
           name: true,
-          fullAccess: true,
         },
         with: {
-          permissions: {
+          apiPermissions: {
             with: {
-              permission: {
+              apiPermission: {
                 columns: {
                   id: true,
                   resource: true,
@@ -47,19 +46,23 @@ async function findUserPermissions(accountId: string): Promise<UserPermission> {
       },
     },
     where: (t, { eq, isNull, and }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
-  if (!account) throw new Error("User not found");
+  if (!member) throw new Error("User not found");
 
-  const isOwner = account.role === "owner";
-  const roleName = isOwner ? "owner" : (account.customRole?.name ?? account.role ?? "");
-  const fullAccess = isOwner || account.customRole?.fullAccess === true;
+  const customRole = (member as any).customRole as
+    | { id: string; name: string; apiPermissions?: { apiPermission: { id: string; resource: string; action: string } }[] }
+    | null
+    | undefined;
+
+  const isOwner = member.role === "owner";
+  const roleName = isOwner ? "owner" : (customRole?.name ?? member.role ?? "");
 
   return {
     role: roleName,
-    fullAccess,
-    permissions: account.customRole?.permissions?.map((e: any) => e.permission) ?? [],
+    isOwner,
+    permissions: customRole?.apiPermissions?.map((e) => e.apiPermission) ?? [],
   };
 }
 

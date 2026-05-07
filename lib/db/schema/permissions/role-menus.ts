@@ -7,18 +7,14 @@ export const roleMenus = pgTable(
   "role_menus",
   {
     roleId: varchar("role_id", { length: 20 })
-      .references(() => roles.id)
+      .references(() => roles.id, { onDelete: "cascade" })
       .notNull(),
     menuId: varchar("menu_id", { length: 20 })
-      .references(() => menus.id)
+      .references(() => menus.id, { onDelete: "cascade" })
       .notNull(),
   },
   (table) => [
-    primaryKey({
-      columns: [table.roleId, table.menuId],
-    }),
-    // Add indexes for foreign key columns to improve join performance
-    index("role_menus_role_id_idx").on(table.roleId),
+    primaryKey({ columns: [table.roleId, table.menuId] }),
     index("role_menus_menu_id_idx").on(table.menuId),
   ],
 );

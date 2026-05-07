@@ -36,7 +36,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 export default function TwoFactorAuthentication() {
-  const t = useTranslations("account.2fa");
+  const t = useTranslations("member.2fa");
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);

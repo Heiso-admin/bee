@@ -260,7 +260,8 @@
   },
   "otp": {
     "title": "Check your email",
-    "description": "We've sent you a passcode.\n Please check your inbox at {email}.",
+    "description": "We sent a sign-in link to {email}. Click it to continue.",
+    "verifying": "Signing you in…",
     "email": {
       "label": "Email address",
       "placeholder": "Enter your email address",
@@ -283,6 +284,7 @@
       "text": "Didn't receive the code?",
       "action": "Resend code",
       "countdown": "Resend in {seconds}s",
+      "maxReached": "Resend limit reached",
       "button": "Resend Email",
       "prefix": "Haven't received?"
     },

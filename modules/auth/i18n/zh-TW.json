@@ -250,7 +250,8 @@
   },
   "otp": {
     "title": "請檢查您的電子郵件",
-    "description": "我們已向您發送一組驗證碼，\n 請至 {email} 的收件箱查收。",
+    "description": "我們已將登入連結寄至 {email}，點擊連結即可繼續。",
+    "verifying": "登入中…",
     "email": {
       "label": "電子郵件地址",
       "placeholder": "請輸入您的電子郵件地址",
@@ -272,7 +273,8 @@
     "resend": {
       "text": "沒有收到驗證碼？",
       "action": "重新發送驗證碼",
-      "countdown": "{seconds} 秒後可重新發送"
+      "countdown": "{seconds} 秒後可重新發送",
+      "maxReached": "已達重送上限"
     },
     "success": {
       "codeSent": "驗證碼已發送至 {email}",

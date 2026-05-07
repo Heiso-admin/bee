@@ -2,14 +2,14 @@
 
 import { cache } from "react";
 import { db } from "@heiso-io/bee/lib/db";
-import type { TPermission } from "@heiso-io/bee/lib/db/schema";
+import type { TApiPermission } from "@heiso-io/bee/lib/db/schema";
 import { roleMenus } from "@heiso-io/bee/lib/db/schema";
 import { auth } from "@heiso-io/bee/modules/auth/auth.config";
 import { eq, and } from "drizzle-orm";
 
 // Types
 type AccessParams = {
-  fullAccess: boolean;
+  isOwner?: boolean;
   roleId?: string | null;
 };
 
@@ -21,36 +21,36 @@ const UNAUTHORIZED_ERROR = "Unauthorized";
  */
 async function getAccount() {
   const session = await auth();
-  const accountId = session?.user?.id;
-  if (!accountId) throw new Error(UNAUTHORIZED_ERROR);
+  const memberId = session?.user?.id;
+  if (!memberId) throw new Error(UNAUTHORIZED_ERROR);
 
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
       email: true,
       name: true,
     },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
-  return account ?? null;
+  return member ?? null;
 }
 
 /**
  * 取得當前帳號的成員資格
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 const getMyMembership = cache(async () => {
   const t0 = performance.now();
   const session = await auth();
-  const accountId = session?.user?.id;
-  if (!accountId) throw new Error(UNAUTHORIZED_ERROR);
+  const memberId = session?.user?.id;
+  if (!memberId) throw new Error(UNAUTHORIZED_ERROR);
 
   const kind: "dev" | "member" = (session?.user?.kind ?? "member") as "dev" | "member";
 
   const tDb = performance.now();
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
       roleId: true,
@@ -61,12 +61,11 @@ const getMyMembership = cache(async () => {
       customRole: {
         columns: {
           id: true,
-          fullAccess: true,
         },
       },
     },
     where: (t, { eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
   const tEnd = performance.now();
@@ -83,12 +82,12 @@ const getMyMembership = cache(async () => {
 
   return {
     kind,
-    id: account?.id,
-    accountId: account?.id,
-    roleId: account?.roleId,
-    role: account?.role,
-    status: account?.status,
-    customRole: account?.customRole,
+    id: member?.id,
+    memberId: member?.id,
+    roleId: member?.roleId,
+    role: member?.role,
+    status: member?.status,
+    customRole: member?.customRole,
   };
 });
 
@@ -98,11 +97,11 @@ const getMyMembership = cache(async () => {
  * - Otherwise, returns an array of menu IDs from role_menus table
  */
 async function getMyAllowedMenuIds({
-  fullAccess,
+  isOwner,
   roleId,
 }: AccessParams): Promise<string[] | null> {
-  // Full access means all menus are allowed
-  if (fullAccess) {
+  // Owner = structural bypass，all menus allowed
+  if (isOwner) {
     return null;
   }
 
@@ -127,14 +126,12 @@ async function getMyAllowedMenuIds({
  * 取得組織權限
  */
 async function getMyOrgPermissions({
-  fullAccess,
+  isOwner,
   roleId,
-}: AccessParams): Promise<Pick<TPermission, "resource" | "action">[]> {
-  if (!roleId) return [];
-
-
-  if (fullAccess) {
-    return db.query.permissions.findMany({
+}: AccessParams): Promise<Pick<TApiPermission, "resource" | "action">[]> {
+  // Owner = structural bypass，all permissions allowed
+  if (isOwner) {
+    return db.query.apiPermissions.findMany({
       columns: {
         resource: true,
         action: true,
@@ -144,9 +141,11 @@ async function getMyOrgPermissions({
     });
   }
 
-  const rolePermissionsResult = await db.query.rolePermissions.findMany({
+  if (!roleId) return [];
+
+  const rolePermissionsResult = await db.query.roleApiPermissions.findMany({
     with: {
-      permission: {
+      apiPermission: {
         columns: {
           resource: true,
           action: true,
@@ -156,7 +155,9 @@ async function getMyOrgPermissions({
     where: (t, { eq }) => eq(t.roleId, roleId),
   });
 
-  return rolePermissionsResult.map((item) => item.permission).filter(Boolean);
+  return rolePermissionsResult
+    .map((item) => item.apiPermission)
+    .filter(Boolean) as Pick<TApiPermission, "resource" | "action">[];
 }
 
 const getUser = getAccount;

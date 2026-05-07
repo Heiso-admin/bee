@@ -1,15 +1,15 @@
 "use server";
 
-import { updateAccount } from "@heiso-io/bee/lib/accounts/account-adapter";
+import { updateMember } from "@heiso-io/bee/lib/members/member-adapter";
 
 /**
  * Update avatar
- * Core mode: Update accounts table
+ * Core mode: Update members table
  * CMS mode: Requires cell DB
  */
 export async function updateAvatar(userId: string, avatar: string) {
   try {
-    await updateAccount(userId, {
+    await updateMember(userId, {
       avatar,
       updatedAt: new Date(),
     } as any);
@@ -30,12 +30,12 @@ export async function updateAvatar(userId: string, avatar: string) {
 
 /**
  * Update nickname
- * Core mode: Update accounts table
+ * Core mode: Update members table
  * CMS mode: Requires cell DB
  */
 export async function updateNickname(userId: string, name: string) {
   try {
-    await updateAccount(userId, {
+    await updateMember(userId, {
       name,
       updatedAt: new Date(),
     } as any);

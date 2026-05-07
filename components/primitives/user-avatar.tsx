@@ -40,7 +40,7 @@ export function UserAvatar({
   className?: string;
   menu: UserAvatarMenuItem[];
 }) {
-  const { account } = useAccount();
+  const { member } = useAccount();
   const { role } = usePermissionContext();
   const { data: session } = useSession();
 
@@ -58,13 +58,13 @@ export function UserAvatar({
   //       {
   //         id: 'dev-center',
   //         text: 'Dev Center',
-  //         href: '/portal/core/staff-center',
+  //         href: '/portal/dev-center',
   //         type: 'Link',
   //       },
   //       {
   //         id: 'accountSettings',
   //         text: 'Account Settings',
-  //         href: '/portal/core/account/me',
+  //         href: '/portal/account/me',
   //         type: 'Link',
   //       },
   //     ],
@@ -95,11 +95,11 @@ export function UserAvatar({
   //   },
   // ] satisfies MenuItem[];
 
-  if (!account) return null;
+  if (!member) return null;
 
-  const image = account?.avatar ?? "";
-  const displayName = account?.name ?? "";
-  const email = account?.email ?? "";
+  const image = member?.avatar ?? "";
+  const displayName = member?.name ?? "";
+  const email = member?.email ?? "";
 
   return (
     <div className={className}>
@@ -169,9 +169,9 @@ export function UserAvatar({
             }
 
             if (item.type === "LogOut") {
-              // DevLogin users should be redirected to /devlogin after logout
+              // DevLogin users should be redirected to /auth/login after logout
               const isDev = session?.user?.kind === "dev";
-              const logoutPath = isDev ? "/auth/devlogin" : "/auth/login";
+              const logoutPath = isDev ? "/auth/login" : "/auth/login";
 
               return (
                 <DropdownMenuItem
@@ -198,11 +198,11 @@ export function UserAvatar({
               <DropdownMenuItem>Dashboard</DropdownMenuItem>
             </Link>
             {isDeveloper && (
-              <Link href="/portal/core/staff-center">
+              <Link href="/portal/dev-center">
                 <DropdownMenuItem>Dev Center</DropdownMenuItem>
               </Link>
             )}
-            <Link href="/portal/core/account/me">
+            <Link href="/portal/account/me">
               <DropdownMenuItem>Account Settings</DropdownMenuItem>
             </Link>
           </DropdownMenuGroup>

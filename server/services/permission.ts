@@ -7,23 +7,22 @@ const permissionCache = new Map<string, roleService.UserPermission>();
 
 export async function getUserPermissions() {
   const session = await auth();
-  const accountId = session?.user?.id;
-  if (!accountId) throw new Error("Unauthorized");
+  const memberId = session?.user?.id;
+  if (!memberId) throw new Error("Unauthorized");
 
   // [MOVED UP] Check Admin FIRST - DevLogin users should always get Admin role
   if (session.user.kind === "dev") {
     return {
       role: 'Admin',
-      fullAccess: true,
       permissions: [],
     };
   }
 
-  const cached = permissionCache.get(accountId);
+  const cached = permissionCache.get(memberId);
   if (cached) return cached;
 
-  const permissions = await roleService.findUserPermissions(accountId);
-  permissionCache.set(accountId, permissions);
+  const permissions = await roleService.findUserPermissions(memberId);
+  permissionCache.set(memberId, permissions);
   return permissions;
 }
 

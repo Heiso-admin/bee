@@ -18,15 +18,15 @@ const passwordSchema = z
  * 更新密碼
  * 注意：密碼儲存在 cell DB，此功能需要 cell DB 支援
  */
-export async function updatePassword(accountId: string, data: unknown) {
+export async function updatePassword(memberId: string, data: unknown) {
   const result = passwordSchema.safeParse(data);
   if (!result.success) {
     throw new Error("Invalid password format");
   }
 
   // TODO: 呼叫 cell DB 更新密碼
-  // 密碼現在儲存在 cell DB 的 accounts 表
-  // 需要實作 cell DB: POST /api/platform/accounts/:accountId/update-password
+  // 密碼現在儲存在 cell DB 的 members 表
+  // 需要實作 cell DB: POST /api/platform/members/:memberId/update-password
   console.warn("[updatePassword] Password update requires cell DB implementation");
 
   throw new Error("Password update requires cell DB implementation");
@@ -36,21 +36,21 @@ export async function updatePassword(accountId: string, data: unknown) {
  * 切換 2FA
  * 注意：2FA 設定儲存在 cell DB，此功能需要 cell DB 支援
  */
-export async function toggle2FA(accountId: string, enabled: boolean) {
+export async function toggle2FA(memberId: string, enabled: boolean) {
   // TODO: 呼叫 cell DB 更新 2FA 設定
-  // 2FA 設定現在儲存在 cell DB 的 accounts 表
+  // 2FA 設定現在儲存在 cell DB 的 members 表
   console.warn("[toggle2FA] 2FA toggle requires cell DB implementation");
 
   throw new Error("2FA toggle requires cell DB implementation");
 }
 
 /**
- * 透過 accountId 查詢成員資格（含角色）
- * 統一使用 accounts 表
+ * 透過 memberId 查詢成員資格（含角色）
+ * 統一使用 members 表
  */
-export async function findMembershipByAccountId(accountId: string) {
+export async function findMembershipByAccountId(memberId: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
       status: true,
@@ -59,21 +59,21 @@ export async function findMembershipByAccountId(accountId: string) {
     },
     with: {
       customRole: {
-        columns: { id: true, name: true, fullAccess: true }
+        columns: { id: true, name: true }
       }
     },
     where: (t, { and, eq, isNull }) =>
-      and(eq(t.id, accountId), isNull(t.deletedAt)),
+      and(eq(t.id, memberId), isNull(t.deletedAt)),
   });
 
-  if (!account) return null;
+  if (!member) return null;
 
   return {
-    id: account.id,
-    accountId: account.id,
-    status: account.status,
-    role: account.role,
-    customRole: account.customRole,
+    id: member.id,
+    memberId: member.id,
+    status: member.status,
+    role: member.role,
+    customRole: member.customRole,
   };
 }
 

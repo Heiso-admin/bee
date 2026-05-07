@@ -18,12 +18,13 @@ import type zod from "zod";
 /**
  * settings 表
  *
- * 用於存放所有系統設定，用 group 區分用途：
- * - 'system': 後端系統設定（含 tenantId 識別、API key、OAuth 等）
- * - 'site': 前端網站設定（basic、branding、assets、SEO 等）
+ * 存放 runtime 可改的設定（admin UI 編輯，不要重 deploy），用 group 區分：
+ * - 'system': 後端基礎設定（NOTIFY_EMAIL、BASE_HOST、OAuth credentials 等）
+ * - 'site': 前端展示設定（org name、logo、branding、SEO meta 等）
  *
- * 特殊設定：
- * - name='tenantId', group='system': 用於識別此 DB 所屬租戶
+ * 不放這裡：
+ * - tenantId / DATABASE_URL / ERROR_CODE_SECRET 等 deploy-time 不可變的 → env
+ * - 業務資料（members、posts、roles）→ domain table
  */
 export const settings = pgTable(
   "settings",

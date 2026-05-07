@@ -7,7 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 import { getMyMembership, getMyAllowedMenuIds } from "./_server/membership.service";
 import { buildDashboardNavigation } from "./dashboard-config";
-import type { DashboardMenu } from "@heiso-io/bee/config/menus";
+import type { DashboardMenu } from "@heiso-io/bee/modules/portal/(dashboard)/dashboard-config";
 
 interface OrgLayoutProps {
   children: React.ReactNode;
@@ -58,10 +58,8 @@ async function OrgLayoutWrap({
   //   }
   //   redirect('/join');
   // }
-  const hasFullAccess =
-    membership.kind === "dev" ||
-    membership.role === 'owner' ||
-    membership.customRole?.fullAccess === true;
+  const isOwner =
+    membership.kind === "dev" || membership.role === 'owner';
 
   // Get translations
   const t = await getTranslations("dashboard.userMenu");
@@ -69,7 +67,7 @@ async function OrgLayoutWrap({
 
   // Build navigation menu from static config
   const allowedMenuIds = await getMyAllowedMenuIds({
-    fullAccess: hasFullAccess,
+    isOwner,
     roleId: membership?.roleId,
   });
 
@@ -95,7 +93,7 @@ async function OrgLayoutWrap({
         {
           id: "accountSettings",
           text: t("accountSettings"),
-          href: "/portal/core/account/me",
+          href: "/portal/account/me",
           type: "Link",
         },
       ],
@@ -130,7 +128,7 @@ async function OrgLayoutWrap({
     userAvatarMenu[0].group?.push({
       id: "dev-center",
       text: t("developer"),
-      href: "/portal/core/staff-center",
+      href: "/portal/dev-center",
       type: "Link",
     });
   }

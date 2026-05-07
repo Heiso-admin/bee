@@ -1,7 +1,15 @@
 import type { Navigation } from "@heiso-io/bee/types/client";
-import type { DashboardMenu } from "@heiso-io/bee/config/menus";
 
 export type DashboardMenuKey = string;
+
+export type DashboardMenu = {
+  group: string;
+  name: string;
+  path: string;
+  icon: string;
+  title: string;
+  order: number;
+};
 
 /**
  * Transforms static menu config into Navigation structure.

@@ -10,7 +10,7 @@ import {
   checkTenantHasOwner,
   ensureMemberOnFirstLogin,
   getMember,
-  getAccountByEmail,
+  getMemberByEmail,
 } from "../_server/user.service";
 import { seedDefaults } from "@heiso-io/bee/modules/system/provisioning";
 import { db } from "@heiso-io/bee/lib/db";
@@ -91,7 +91,7 @@ export default async function Page({
 
     // Fix: Verify if user really exists in DB (Zombie Session Check)
     if (sessionEmail) {
-      const dbUser = await getAccountByEmail(sessionEmail);
+      const dbUser = await getMemberByEmail(sessionEmail);
       if (!dbUser) {
         // User in session but not in DB. Force logout.
         redirect("/api/auth/signout");
@@ -102,7 +102,7 @@ export default async function Page({
 
     if (member) {
       oAuthData = {
-        userId: member.accountId,
+        userId: member.memberId,
         email: session.user.email ?? null,
         status: member.status,
       };
@@ -123,7 +123,7 @@ export default async function Page({
           const refreshed = await getMember(userId);
           if (refreshed) {
             oAuthData = {
-              userId: refreshed.accountId,
+              userId: refreshed.memberId,
               email: sessionEmail,
               status: refreshed.status,
             };

@@ -44,6 +44,7 @@ import {
 import { Separator } from "@heiso-io/bee/components/ui/separator";
 import { Textarea } from "@heiso-io/bee/components/ui/textarea";
 import type { TMenu } from "@heiso-io/bee/lib/db/schema";
+import { MODULES } from "@heiso-io/bee/lib/modules";
 import { cn } from "@heiso-io/bee/lib/utils";
 import { useAccount } from "@heiso-io/bee/providers/account";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,7 +83,8 @@ export function RoleList({
   permissions: any;
 }) {
   const t = useTranslations("dashboard.permission.role");
-  const { staff } = useAccount();
+  const { kind } = useAccount();
+  const staff = kind === "dev";
   const pathname = usePathname();
 
   const [open, setOpen] = useState(false);
@@ -101,7 +103,7 @@ export function RoleList({
           data={selectedItem}
         />
         <div className="flex items-center justify-between mb-4">
-          <CaptionTotal title={t("title")} total={data.length} />
+          <h2 className="text-2xl font-semibold tracking-tight">{t("title")}</h2>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -146,7 +148,8 @@ function RoleItemCollapsible({
   isCollapsedClose: boolean;
 }) {
   const t = useTranslations("dashboard.permission.role");
-  const { staff } = useAccount();
+  const { kind } = useAccount();
+  const staff = kind === "dev";
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -154,15 +157,25 @@ function RoleItemCollapsible({
     role.menus?.map((m: any) => m.menus.id) ?? [],
   );
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
-    role.permissions?.map((p: any) => p.permission.id) ?? [],
+    role.apiPermissions?.map((p: any) => p.permission.id) ?? [],
   );
   const [name, setName] = useState<string>(role.name || "");
   const [description, setDescription] = useState<string>(
     role.description || "",
   );
-  const [fullAccessEditing, setFullAccessEditing] = useState<boolean>(
-    role.fullAccess ?? false,
+  const [allowMagicLink, setAllowMagicLink] = useState<boolean>(
+    role.allowMagicLink ?? true,
   );
+  const [allowPassword, setAllowPassword] = useState<boolean>(
+    role.allowPassword ?? true,
+  );
+  const [allowTwoFactor, setAllowTwoFactor] = useState<boolean>(
+    role.allowTwoFactor ?? false,
+  );
+  const [allowedModules, setAllowedModules] = useState<string[]>(
+    role.allowedModules ?? [],
+  );
+  const [fullAccessEditing, setFullAccessEditing] = useState<boolean>(false);
   const prevPermissionsRef = useRef<string[] | null>(null);
   const prevMenusRef = useRef<string[] | null>(null);
   const [isSaving, startTransition] = useTransition();
@@ -177,7 +190,7 @@ function RoleItemCollapsible({
     [],
   );
   const getRolePermissionIds = useCallback(
-    (r: Role) => r.permissions?.map((p: any) => p.permission.id) ?? [],
+    (r: Role) => r.apiPermissions?.map((p: any) => p.permission.id) ?? [],
     [],
   );
 
@@ -188,7 +201,11 @@ function RoleItemCollapsible({
       setSelectedPermissions(getRolePermissionIds(r));
       setName(r.name || "");
       setDescription(r.description || "");
-      setFullAccessEditing(r.fullAccess ?? false);
+      setAllowMagicLink(r.allowMagicLink ?? true);
+      setAllowPassword(r.allowPassword ?? true);
+      setAllowTwoFactor(r.allowTwoFactor ?? false);
+      setAllowedModules(r.allowedModules ?? []);
+      setFullAccessEditing(false);
       prevPermissionsRef.current = null;
       prevMenusRef.current = null;
     },
@@ -285,11 +302,18 @@ function RoleItemCollapsible({
   };
 
   const handleSave = () => {
+    if (!allowMagicLink && !allowPassword && !allowTwoFactor) {
+      toast.error("At least one login method must be enabled");
+      return;
+    }
     startTransition(async () => {
       await updateRole(role.id, {
         name,
         description,
-        fullAccess: fullAccessEditing,
+        allowMagicLink,
+        allowPassword,
+        allowTwoFactor,
+        allowedModules,
       });
       await assignMenus({ roleId: role.id, menus: selectedMenus });
       await assignPermissions({
@@ -348,8 +372,24 @@ function RoleItemCollapsible({
             )}
           </div>
         </CollapsibleTrigger>
-        {/* Login method selector removed - managed at platform level */}
-        <div className="flex items-center gap-2 text-muted-foreground text-sm" />
+        {/* Login methods summary chips — view-only in row header. Edit happens in the body section below. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {role.allowMagicLink && (
+            <Badge variant="outline" className="font-normal">
+              Magic link
+            </Badge>
+          )}
+          {role.allowPassword && (
+            <Badge variant="outline" className="font-normal">
+              Password
+            </Badge>
+          )}
+          {role.allowTwoFactor && (
+            <Badge variant="outline" className="font-normal">
+              2FA
+            </Badge>
+          )}
+        </div>
 
 
         <div className="flex items-center">
@@ -424,6 +464,139 @@ function RoleItemCollapsible({
         </span>
         <Separator />
 
+        {/* Login methods section */}
+        <div className="space-y-3">
+          <div>
+            <h5 className="text-sm font-medium text-muted-foreground">
+              Login methods
+            </h5>
+            <p className="text-xs text-muted-foreground/80 mt-1">
+              Pick which sign-in options members of this role can use. At least one must be enabled.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <label
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                isEditing
+                  ? "cursor-pointer hover:bg-accent/50"
+                  : "opacity-70 cursor-default",
+                allowMagicLink && "border-primary/40 bg-primary/5",
+              )}
+            >
+              <Checkbox
+                checked={allowMagicLink}
+                disabled={!isEditing}
+                onCheckedChange={(c) => setAllowMagicLink(c === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <div className="text-sm font-medium">Magic link</div>
+                <div className="text-xs text-muted-foreground">
+                  Passwordless sign-in via emailed one-click link
+                </div>
+              </div>
+            </label>
+            <label
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                isEditing
+                  ? "cursor-pointer hover:bg-accent/50"
+                  : "opacity-70 cursor-default",
+                allowPassword && "border-primary/40 bg-primary/5",
+              )}
+            >
+              <Checkbox
+                checked={allowPassword}
+                disabled={!isEditing}
+                onCheckedChange={(c) => setAllowPassword(c === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <div className="text-sm font-medium">Password</div>
+                <div className="text-xs text-muted-foreground">
+                  Email + password, no second factor
+                </div>
+              </div>
+            </label>
+            <label
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                isEditing
+                  ? "cursor-pointer hover:bg-accent/50"
+                  : "opacity-70 cursor-default",
+                allowTwoFactor && "border-primary/40 bg-primary/5",
+              )}
+            >
+              <Checkbox
+                checked={allowTwoFactor}
+                disabled={!isEditing}
+                onCheckedChange={(c) => setAllowTwoFactor(c === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <div className="text-sm font-medium">2FA</div>
+                <div className="text-xs text-muted-foreground">
+                  Password + one-time code by email
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Modules section — which top-level features the role can access */}
+        <div className="space-y-3">
+          <div>
+            <h5 className="text-sm font-medium text-muted-foreground">
+              Modules
+            </h5>
+            <p className="text-xs text-muted-foreground/80 mt-1">
+              Pick which feature modules this role can access. Sidebar / menus only show items from enabled modules.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {MODULES.map((mod) => {
+              const checked = allowedModules.includes(mod.id);
+              return (
+                <label
+                  key={mod.id}
+                  className={cn(
+                    "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                    isEditing
+                      ? "cursor-pointer hover:bg-accent/50"
+                      : "opacity-70 cursor-default",
+                    checked && "border-primary/40 bg-primary/5",
+                  )}
+                >
+                  <Checkbox
+                    checked={checked}
+                    disabled={!isEditing}
+                    onCheckedChange={(c) => {
+                      if (!isEditing) return;
+                      setAllowedModules((prev) =>
+                        c === true
+                          ? [...prev, mod.id]
+                          : prev.filter((id) => id !== mod.id),
+                      );
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">{mod.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {mod.description}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Header row */}
         <div className="grid items-center justify-between" style={ItemColStyle}>
           <div className="flex items-center gap-2 ">
@@ -444,7 +617,7 @@ function RoleItemCollapsible({
                 {t("form.menuTitle")}
               </h5>
             </label>
-            {(role.fullAccess || fullAccessEditing) && (
+            {(false || fullAccessEditing) && (
               <Badge className="ml-1" variant="outline">
                 {t("list.full_access")}
               </Badge>
@@ -505,13 +678,12 @@ function CreateOrUpdateRole({
   const formSchema = z.object({
     name: z.string().min(1, { message: t("validation.name_required") }),
     description: z.string().optional(),
-    fullAccess: z.boolean().optional(),
+
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullAccess: false,
     },
   });
 
@@ -519,7 +691,6 @@ function CreateOrUpdateRole({
     if (data) {
       form.setValue("name", data.name);
       form.setValue("description", data.description ?? "");
-      form.setValue("fullAccess", data.fullAccess ?? false);
     }
   }, [data, form]);
 
@@ -572,22 +743,6 @@ function CreateOrUpdateRole({
                   <FormControl>
                     <Textarea placeholder={t("description")} {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="fullAccess"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <FormLabel>{t("full_access")}</FormLabel>
                   <FormMessage />
                 </FormItem>
               )}

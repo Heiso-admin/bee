@@ -2,28 +2,28 @@
 
 import { settings } from "@heiso-io/bee/config/settings";
 import { db } from "@heiso-io/bee/lib/db";
-import { userPasswordReset, accounts } from "@heiso-io/bee/lib/db/schema";
+import { memberPasswordReset, members } from "@heiso-io/bee/lib/db/schema";
 import { sendForgotPasswordEmail } from "@heiso-io/bee/lib/email";
 import { hashPassword } from "@heiso-io/bee/lib/hash";
 import { generateId } from "@heiso-io/bee/lib/id-generator";
 import { consumeRateLimit } from "@heiso-io/bee/lib/rate-limit";
 import { eq } from "drizzle-orm";
 import { ALLOWED_DEV_EMAILS } from "@heiso-io/bee/modules/auth/auth.config";
-import { getAccountByEmail } from "./user.service";
+import { getMemberByEmail } from "./user.service";
 
 async function updatePassword(
-  accountId: string,
+  memberId: string,
   hashedPassword: string,
   mustChange: boolean = false,
 ) {
   await db
-    .update(accounts)
+    .update(members)
     .set({
       password: hashedPassword,
       mustChangePassword: mustChange,
       updatedAt: new Date(),
     })
-    .where(eq(accounts.id, accountId));
+    .where(eq(members.id, memberId));
 }
 
 /**
@@ -36,22 +36,22 @@ export async function requestPasswordReset(email: string) {
     return { ok: true }; // 不告知 attacker 被限流（防 email enumeration）
   }
 
-  // dev 帳號禁止 password reset（僅走 OTP /devlogin），silently no-op
+  // dev 帳號禁止 password reset（僅走 OTP），silently no-op
   if (ALLOWED_DEV_EMAILS.includes(email.trim().toLowerCase())) {
     return { ok: true };
   }
 
-  const account = await getAccountByEmail(email);
+  const member = await getMemberByEmail(email);
 
-  if (!account) {
+  if (!member) {
     return { ok: true };
   }
 
   const token = generateId(undefined, 32);
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
-  await db.insert(userPasswordReset).values({
-    accountId: account.id,
+  await db.insert(memberPasswordReset).values({
+    memberId: member.id,
     token,
     expiresAt,
     used: false,
@@ -65,7 +65,7 @@ export async function requestPasswordReset(email: string) {
     to: [email],
     subject: "Reset your password",
     resetLink,
-    name: account.name ?? "",
+    name: member.name ?? "",
   });
 
   return { ok: true };
@@ -75,23 +75,23 @@ export async function requestPasswordReset(email: string) {
  * Reset password using token: validate, update user password, mark token used
  */
 export async function resetPassword(token: string, newPassword: string) {
-  const record = await db.query.userPasswordReset.findFirst({
+  const record = await db.query.memberPasswordReset.findFirst({
     where: (t, { and, eq, gt }) =>
       and(eq(t.token, token), eq(t.used, false), gt(t.expiresAt, new Date())),
   });
 
-  if (!record || !record.accountId) {
+  if (!record || !record.memberId) {
     throw new Error("Invalid or expired reset token");
   }
 
   const hashedPassword = await hashPassword(newPassword);
 
-  await updatePassword(record.accountId, hashedPassword, false);
+  await updatePassword(record.memberId, hashedPassword, false);
 
   await db
-    .update(userPasswordReset)
+    .update(memberPasswordReset)
     .set({ used: true })
-    .where(eq(userPasswordReset.id, record.id));
+    .where(eq(memberPasswordReset.id, record.id));
 
   return { ok: true };
 }
@@ -99,7 +99,7 @@ export async function resetPassword(token: string, newPassword: string) {
 /**
  * Directly change the user's password
  */
-export async function changePassword(accountId: string, newPassword: string) {
+export async function changePassword(memberId: string, newPassword: string) {
   const hashedPassword = await hashPassword(newPassword);
-  await updatePassword(accountId, hashedPassword, false);
+  await updatePassword(memberId, hashedPassword, false);
 }

@@ -95,7 +95,7 @@ export async function seedDefaults(db: any, modules: string[], tenantId: string)
                     await tx.insert(roles).values({
                         name: r.name,
                         description: r.description,
-                        fullAccess: r.fullAccess,
+
                     });
                 }
             });

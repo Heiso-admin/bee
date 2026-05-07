@@ -45,8 +45,8 @@ const CATEGORY_DEFAULTS: Record<
 
 export async function saveFile(file: UploadedFile) {
   const session = await auth();
-  const accountId = session?.user?.id;
-  if (!accountId) {
+  const memberId = session?.user?.id;
+  if (!memberId) {
     throw new Error("Unauthorized");
   }
 
@@ -118,7 +118,7 @@ export async function saveFile(file: UploadedFile) {
         path: file.path,
         mimeType: file.type,
         metadata: {},
-        ownerId: accountId,
+        ownerId: memberId,
         folderId: fileType,
         hash: file.hash,
         scanStatus: "clean",
@@ -136,15 +136,15 @@ export async function saveFile(file: UploadedFile) {
  */
 export async function deleteFile(fileId: string) {
   const session = await auth();
-  const accountId = session?.user?.id;
-  if (!accountId) {
+  const memberId = session?.user?.id;
+  if (!memberId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const [updated] = await db
     .update(files)
     .set({ deletedAt: new Date() })
-    .where(and(eq(files.id, fileId), eq(files.ownerId, accountId)))
+    .where(and(eq(files.id, fileId), eq(files.ownerId, memberId)))
     .returning();
 
   if (!updated) {
@@ -159,15 +159,15 @@ export async function deleteFile(fileId: string) {
  */
 export async function getDownloadUrl(fileId: string) {
   const session = await auth();
-  const accountId = session?.user?.id;
-  if (!accountId) {
+  const memberId = session?.user?.id;
+  if (!memberId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const file = await db.query.files.findFirst({
     where: and(
       eq(files.id, fileId),
-      eq(files.ownerId, accountId),
+      eq(files.ownerId, memberId),
       isNull(files.deletedAt)
     ),
   });

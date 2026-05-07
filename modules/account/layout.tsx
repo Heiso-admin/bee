@@ -15,35 +15,41 @@ export default async function DashboardLayout({
   if (!session?.user) return null;
 
   const membership = await getMyMembership();
-  const t = await getTranslations("account.layout");
+  const t = await getTranslations("member.layout");
 
   const navigation: Navigation = {
-    rootPath: "/portal/core/account",
+    rootPath: "/portal/account",
     items: [
-      {
-        id: "preferences",
-        title: t("navigation.preferences"),
-        path: "/me",
-        icon: "user-round-cog",
-      },
-      {
-        id: "Authentication",
-        title: t("navigation.authentication"),
-        path: "/authentication",
-        icon: "shield-user",
-      },
-      {
-        id: "team",
-        title: t("navigation.team"),
-        path: "/team",
-        icon: "users-round",
-      },
-      {
-        id: "role",
-        title: t("navigation.role"),
-        path: "/role",
-        icon: "square-user-round",
-      },
+      // Personal — settings for the current member
+      [
+        {
+          id: "preferences",
+          title: t("navigation.preferences"),
+          path: "/me",
+          icon: "user-round-cog",
+        },
+        {
+          id: "Authentication",
+          title: t("navigation.authentication"),
+          path: "/authentication",
+          icon: "shield-user",
+        },
+      ],
+      // Team management — org-wide
+      [
+        {
+          id: "team",
+          title: t("navigation.team"),
+          path: "/team",
+          icon: "users-round",
+        },
+        {
+          id: "role",
+          title: t("navigation.role"),
+          path: "/role",
+          icon: "square-user-round",
+        },
+      ],
     ],
   };
 
@@ -61,7 +67,7 @@ export default async function DashboardLayout({
         // {
         //   id: 'accountSettings',
         //   text: 'Account Settings',
-        //   href: '/portal/core/account/me',
+        //   href: '/portal/account/me',
         //   type: 'Link',
         // },
       ],
@@ -96,7 +102,7 @@ export default async function DashboardLayout({
     userAvatarMenu[0].group?.push({
       id: "dev-center",
       text: t("userMenu.developer"),
-      href: "/portal/core/staff-center",
+      href: "/portal/dev-center",
       type: "Link",
     });
   }
@@ -108,7 +114,7 @@ export default async function DashboardLayout({
           items: [
             {
               title: t("breadcrumb.account"),
-              link: "/portal/core/account",
+              link: "/portal/account",
             },
           ],
         }}

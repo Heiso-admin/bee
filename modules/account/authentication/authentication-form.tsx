@@ -48,7 +48,7 @@ interface AuthenticationFormProps {
 export default function AuthenticationForm({
   loginMethod,
 }: AuthenticationFormProps) {
-  const t = useTranslations("account.auth");
+  const t = useTranslations("member.auth");
   const { data: session } = useSession();
   const [isUpdatePasswordPending, startUpdatePasswordTransition] =
     useTransition();

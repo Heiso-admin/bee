@@ -8,9 +8,9 @@ export enum MemberStatus {
 }
 
 /**
- * 帳號基本資料（用於 Member.account）
+ * 成員 profile 基本資料（用於 Member.profile）
  */
-export interface MemberAccount {
+export interface MemberProfile {
   id: string;
   email: string;
   name: string;
@@ -20,14 +20,14 @@ export interface MemberAccount {
 }
 
 /**
- * 成員類型（整合帳號與角色資訊）
+ * 成員類型（整合 profile 與角色資訊）
  *
  * 此類型用於團隊成員列表 UI
- * 資料來自 Tenant DB accounts 表
+ * 資料來自 Tenant DB members 表
  */
 export interface Member {
   id: string;
-  accountId: string;
+  memberId: string;
   roleId: string | null;
   role: "owner" | "admin" | "member";
   status: "invited" | "active" | "inactive" | "suspended";
@@ -36,6 +36,6 @@ export interface Member {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  account: MemberAccount;
+  profile: MemberProfile;
   customRole: TRole | null;
 }

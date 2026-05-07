@@ -16,7 +16,7 @@ import {
 } from "drizzle-zod";
 import type zod from "zod/v4";
 import { generateId } from "@heiso-io/bee/lib/id-generator";
-import { accounts } from "../../auth/accounts";
+import { members } from "../../auth/members";
 
 export const pageTemplates = pgTable(
   "page_templates",
@@ -24,7 +24,7 @@ export const pageTemplates = pgTable(
     id: varchar("id", { length: 20 })
       .primaryKey()
       .$defaultFn(() => generateId()),
-    accountId: varchar("account_id", { length: 50 }).notNull(),
+    memberId: varchar("member_id", { length: 50 }).notNull(),
     name: varchar("name", { length: 255 }).notNull(),
     pageId: varchar("page_id", { length: 20 }),
     thumbnail: varchar("thumbnail", { length: 255 }),
@@ -35,7 +35,7 @@ export const pageTemplates = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [
-    index("page_templates_account_id_idx").on(table.accountId),
+    index("page_templates_member_id_idx").on(table.memberId),
     index("page_templates_page_id_idx").on(table.pageId),
   ],
 );
@@ -46,7 +46,7 @@ export const posts = pgTable(
     id: varchar("id", { length: 20 })
       .primaryKey()
       .$defaultFn(() => generateId()),
-    accountId: varchar("account_id", { length: 50 }).notNull(),
+    memberId: varchar("member_id", { length: 50 }).notNull(),
     // categoryId: varchar('category_id', { length: 20 }),
     slug: varchar("slug", { length: 255 }).notNull(),
     title: varchar("title", { length: 255 }),
@@ -68,7 +68,7 @@ export const posts = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [
-    index("pages_account_id_idx").on(table.accountId),
+    index("pages_member_id_idx").on(table.memberId),
     // index('pages_category_id_idx').on(table.categoryId),
     index("pages_slug_idx").on(table.slug),
     index("pages_status_idx").on(table.status),
@@ -82,7 +82,7 @@ export const pageCategories = pgTable(
       .notNull()
       .primaryKey()
       .$defaultFn(() => generateId()),
-    accountId: varchar("account_id", { length: 50 }).notNull(),
+    memberId: varchar("member_id", { length: 50 }).notNull(),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description"),
@@ -91,14 +91,14 @@ export const pageCategories = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (table) => [index("page_categories_account_id_idx").on(table.accountId)],
+  (table) => [index("page_categories_member_id_idx").on(table.memberId)],
 );
 
 export const tags = pgTable(
   "tags",
   {
     id: varchar("id", { length: 200 }).notNull().primaryKey(),
-    accountId: varchar("account_id", { length: 50 }).notNull(),
+    memberId: varchar("member_id", { length: 50 }).notNull(),
     name: varchar("name", { length: 100 }).notNull(),
     slug: varchar("slug", { length: 100 }).notNull().unique(),
     postCount: integer("post_count").default(0),
@@ -106,7 +106,7 @@ export const tags = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (table) => [index("tags_account_id_idx").on(table.accountId)],
+  (table) => [index("tags_member_id_idx").on(table.memberId)],
 );
 
 export const pageCategoryRelations = pgTable(
@@ -127,9 +127,9 @@ export const pageCategoryRelations = pgTable(
 );
 
 export const postRelations = relations(posts, ({ one, many }) => ({
-  user: one(accounts, {
-    fields: [posts.accountId],
-    references: [accounts.id],
+  user: one(members, {
+    fields: [posts.memberId],
+    references: [members.id],
   }),
   categories: many(pageCategoryRelations),
 }));
@@ -151,18 +151,18 @@ export const postPageCategoryRelations = relations(
 export const pageCategoriesRelations = relations(
   pageCategories,
   ({ one, many }) => ({
-    user: one(accounts, {
-      fields: [pageCategories.accountId],
-      references: [accounts.id],
+    user: one(members, {
+      fields: [pageCategories.memberId],
+      references: [members.id],
     }),
     posts: many(pageCategoryRelations),
   }),
 );
 
 export const tagRelations = relations(tags, ({ one, many }) => ({
-  user: one(accounts, {
-    fields: [tags.accountId],
-    references: [accounts.id],
+  user: one(members, {
+    fields: [tags.memberId],
+    references: [members.id],
   }),
   posts: many(posts),
 }));

@@ -81,7 +81,8 @@ export function MemberList({
   menus: TMenu[];
 }) {
   const { data: session } = useSession();
-  const { staff } = useAccount();
+  const { kind } = useAccount();
+  const staff = kind === "dev";
   const [filtering, setFiltering] = useState("");
   const te = useTranslations("dashboard.permission.team");
   const t = useTranslations("dashboard.permission.team.members");
@@ -125,13 +126,13 @@ export function MemberList({
     {
       header: t("user"),
       accessorFn: (row) => {
-        const email = row.account?.email || "";
-        const userName = row.account?.name || email.split("@")[0] || "Unknown";
+        const email = row.profile?.email || "";
+        const userName = row.profile?.name || email.split("@")[0] || "Unknown";
         return `${userName} ${email}`;
       },
       sortingFn: "basic",
       cell: ({ row }) => {
-        const isYou = row.original.accountId === session?.user.id;
+        const isYou = row.original.memberId === session?.user.id;
         return <MemberUser member={row.original} isYou={isYou} />;
       },
     },
@@ -202,7 +203,7 @@ export function MemberList({
     {
       header: t("updatedDate"),
       id: "lastLoginAt",
-      accessorFn: (row) => row.account?.lastLoginAt ?? null,
+      accessorFn: (row) => row.profile?.lastLoginAt ?? null,
       sortingFn: "datetime",
       cell: ({ getValue }) => {
         const value = getValue() as Date | string | null;
@@ -213,7 +214,7 @@ export function MemberList({
       header: t("actions"),
       id: "actions",
       cell: ({ row }) => {
-        const isYou = row.original.accountId === session?.user.id;
+        const isYou = row.original.memberId === session?.user.id;
         return (
           !isYou && (
             <div className="w-full flex items-center justify-center gap-2">
@@ -372,14 +373,14 @@ export const MemberUser = ({
   isYou: boolean;
 }) => {
   const t = useTranslations("dashboard.permission.team.members");
-  const { account, accountId } = member;
-  const email = account?.email || "";
-  const userName = account?.name || email.split("@")[0] || "Unknown";
+  const { profile, memberId } = member;
+  const email = profile?.email || "";
+  const userName = profile?.name || email.split("@")[0] || "Unknown";
   return (
     <div className="flex items-center gap-3 min-h-[35px]">
       <Avatar
         className="h-8 w-8"
-        image={account?.avatar}
+        image={profile?.avatar}
         displayName={userName}
       />
       <div className="flex flex-col">

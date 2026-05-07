@@ -2,57 +2,48 @@
 
 import { db } from "@heiso-io/bee/lib/db";
 import {
-  permissions,
-  type TMenu,
-  type TPermission,
+  apiPermissions,
+  type TApiPermission,
 } from "@heiso-io/bee/lib/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 async function getPermissions() {
-  return db.query.permissions.findMany({
+  return db.query.apiPermissions.findMany({
     where: (t, { isNull }) => isNull(t.deletedAt),
   });
 }
 
-async function groupPermissionsByMenu<T extends TMenu, P extends TPermission>(
-  menus: Pick<T, "id" | "title">[],
+// menu_id 已從 apiPermissions 拿掉（UI / API 解耦）
+// 改成依 resource 分組，每個 resource 列出所有 actions
+async function groupPermissionsByResource<P extends TApiPermission>(
   permissions: P[],
 ) {
-  return menus.map((menu) => {
-    const menuPermissions = permissions.filter((permission) => {
-      return permission.menuId === menu.id;
-    });
-
-    return {
-      id: menu.id,
-      title: menu.title,
-      permissions: menuPermissions.map((p) => ({
-        id: p.id,
-        resource: p.resource,
-        action: p.action,
-      })),
-    };
-  });
+  const grouped: Record<string, { id: string; resource: string; action: string }[]> = {};
+  for (const p of permissions) {
+    if (!grouped[p.resource]) grouped[p.resource] = [];
+    grouped[p.resource].push({ id: p.id, resource: p.resource, action: p.action });
+  }
+  return Object.entries(grouped).map(([resource, items]) => ({
+    resource,
+    permissions: items,
+  }));
 }
 
 async function createPermission({
-  menuId,
   resource,
   action,
 }: {
   space: "Organization" | "Project";
-  menuId?: string;
   resource: string;
   action: string;
 }) {
-  const result = await db.insert(permissions).values({
-    menuId,
+  const result = await db.insert(apiPermissions).values({
     resource,
     action,
   });
 
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
   return result;
 }
 
@@ -66,34 +57,34 @@ async function updatePermission({
   action: string;
 }) {
   const result = await db
-    .update(permissions)
+    .update(apiPermissions)
     .set({
       resource,
       action,
       updatedAt: new Date(),
     })
-    .where(eq(permissions.id, id));
+    .where(eq(apiPermissions.id, id));
 
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
   return result;
 }
 
 async function deletePermission({ id }: { id: string }) {
   const result = await db
-    .update(permissions)
+    .update(apiPermissions)
     .set({
       deletedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(and(eq(permissions.id, id), isNull(permissions.deletedAt)));
+    .where(and(eq(apiPermissions.id, id), isNull(apiPermissions.deletedAt)));
 
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
   return result;
 }
 
 export {
   getPermissions,
-  groupPermissionsByMenu,
+  groupPermissionsByResource,
   createPermission,
   updatePermission,
   deletePermission,

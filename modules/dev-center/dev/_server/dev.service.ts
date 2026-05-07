@@ -6,7 +6,7 @@
  */
 
 type Staff = {
-  accountId: string;
+  memberId: string;
   role: string;
   createdAt: Date;
   user: { id: string; email: string; name: string; avatar: string | null };
@@ -17,12 +17,12 @@ async function getStaff(): Promise<Staff[]> {
   return [];
 }
 
-async function addStaff({ email }: { email: string }): Promise<{ accountId: string }> {
+async function addStaff({ email }: { email: string }): Promise<{ memberId: string }> {
   console.warn("[addStaff] not yet implemented");
   throw new Error("addStaff: DB CRUD not implemented yet");
 }
 
-async function removeStaff({ id }: { id: string }): Promise<{ accountId: string }> {
+async function removeStaff({ id }: { id: string }): Promise<{ memberId: string }> {
   console.warn("[removeStaff] not yet implemented");
   throw new Error("removeStaff: DB CRUD not implemented yet");
 }

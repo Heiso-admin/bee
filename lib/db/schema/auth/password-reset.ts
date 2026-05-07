@@ -6,28 +6,28 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
+import { members } from "./members";
 
 /**
- * userPasswordReset - 密碼重設 token
- *
- * accountId 關聯到 cell DB accounts
+ * memberPasswordReset - 密碼重設 token
  */
-export const userPasswordReset = pgTable(
-  "user_password_reset",
+export const memberPasswordReset = pgTable(
+  "member_password_reset",
   {
     id: varchar("id", { length: 20 })
       .primaryKey()
       .$default(() => generateId()),
-    // TODO: 資料遷移後改回 .notNull()
-    accountId: varchar("account_id", { length: 50 }),
-    token: varchar("token", { length: 100 }).notNull(),
+    memberId: varchar("member_id", { length: 50 })
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    token: varchar("token", { length: 100 }).notNull().unique(),
     used: boolean("used").default(false),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
-    index("user_password_reset_account_id_idx").on(table.accountId),
-    index("user_password_reset_valid_idx").on(table.used, table.expiresAt),
-    index("user_password_reset_token_idx").on(table.token),
+    index("member_password_reset_member_id_idx").on(table.memberId),
+    index("member_password_reset_valid_idx").on(table.used, table.expiresAt),
+    index("member_password_reset_token_idx").on(table.token),
   ],
 );

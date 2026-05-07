@@ -72,35 +72,35 @@ export function EditApiKeyDialog({
 }: EditApiKeyDialogProps) {
   const t = useTranslations("apiKeys");
   const [isPending, startTransition] = useTransition();
-  const [showAdvanced, setShowAdvanced] = useState(!!apiKey.rateLimit);
+  const [showAdvanced, setShowAdvanced] = useState(!!apiKey.rateLimitRequests);
 
   const getInitialPlan = () => {
-    if (apiKey.rateLimit && typeof apiKey.rateLimit === 'object') {
-      const rl = apiKey.rateLimit as { requests?: number, window?: number };
-      if (rl.requests === 500 && rl.window === 60) return "standard";
-      if (rl.requests === 1000 && rl.window === 60) return "professional";
-      if (rl.requests === 3000 && rl.window === 60) return "enterprise";
-      return "standard"; // Fallback to standard if no match
-    }
+    const requests = apiKey.rateLimitRequests;
+    const window = apiKey.rateLimitWindowSeconds;
+    if (requests === 500 && window === 60) return "standard";
+    if (requests === 1000 && window === 60) return "professional";
+    if (requests === 3000 && window === 60) return "enterprise";
     return "standard";
   };
 
-  console.log("apiKey.rateLimit: ", apiKey.rateLimit);
   const form = useForm<EditApiKeyFormData>({
     resolver: zodResolver(editApiKeySchema),
     defaultValues: {
       name: apiKey.name,
-      expiresAt: "never", // Default to never for simplicity in edit mode
+      expiresAt: "never",
       rateLimitPlan: getInitialPlan(),
-      rateLimit: apiKey.rateLimit || { requests: 500, window: 60 },
+      rateLimit: {
+        requests: apiKey.rateLimitRequests ?? 500,
+        window: apiKey.rateLimitWindowSeconds ?? 60,
+      },
     },
   });
 
   // useEffect(() => {
   //   form.setValues({
-  //     rateLimit: apiKey.rateLimit || undefined,
+  //     rateLimit: { requests: apiKey.rateLimitRequests, window: apiKey.rateLimitWindowSeconds } || undefined,
   //   });
-  // }, [apiKey.rateLimit]);
+  // }, [{ requests: apiKey.rateLimitRequests, window: apiKey.rateLimitWindowSeconds }]);
 
   const onSubmit: SubmitHandler<EditApiKeyFormData> = (data) => {
     startTransition(async () => {

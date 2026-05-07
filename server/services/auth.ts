@@ -2,9 +2,9 @@
 
 import { signIn, signOut } from "@heiso-io/bee/modules/auth/auth.config";
 import {
-  hasAnyAccount,
+  hasAnyMember,
   verifyPassword,
-} from "@heiso-io/bee/lib/accounts/account-adapter";
+} from "@heiso-io/bee/lib/members/member-adapter";
 
 export async function login(username: string, password: string) {
   try {
@@ -52,17 +52,17 @@ export async function signup(input: {
   password: string;
 }): Promise<{ id: string; name: string } | null> {
   try {
-    const { createAccount } = await import(
-      "@heiso-io/bee/lib/accounts/account-adapter"
+    const { createMember } = await import(
+      "@heiso-io/bee/lib/members/member-adapter"
     );
-    const account = await createAccount({
+    const member = await createMember({
       email: input.email,
       name: input.name || input.email.split("@")[0],
       password: input.password,
       status: "active",
       role: "member",
     });
-    return { id: account.id, name: account.name };
+    return { id: member.id, name: member.name };
   } catch (error) {
     console.error("Error during signup:", error);
     return null;
@@ -84,7 +84,7 @@ export async function logout() {
  * Check if there is at least one account.
  */
 export async function hasAnyUser() {
-  return await hasAnyAccount();
+  return await hasAnyMember();
 }
 
 export const oAuthLogin = async (provider: string) => {

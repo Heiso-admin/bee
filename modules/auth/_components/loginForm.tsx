@@ -50,6 +50,7 @@ function LoginForm({
   const [step, setStep] = useState<LoginStep>(LoginStepEnum.Email);
   const [error, setError] = useState<string>("");
   const [twoStep, setTwoStep] = useState<boolean>(false);
+  const [devMode, setDevMode] = useState<boolean>(false);
 
   // 若 NextAuth 阻擋了 OAuth 登入（例如 AccessDenied），提示『請使用 email 登入』
   useEffect(() => {
@@ -118,6 +119,7 @@ function LoginForm({
             anyUser={anyUser}
             orgName={orgName}
             handleAuthMethod={handleAuthMethod}
+            setDevMode={setDevMode}
             systemOauth={systemOauth}
           />
         );
@@ -147,6 +149,8 @@ function LoginForm({
             error={error}
             setError={setError}
             handleLoginSuccess={handleLoginSuccess}
+            mode={devMode ? "dev" : "regular"}
+            extraSignInParams={devMode ? { isDevLogin: "true" } : undefined}
           />
         );
 

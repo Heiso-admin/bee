@@ -34,17 +34,17 @@ export default function Preferences() {
 }
 
 function UserAvatar() {
-  const { account, updateAccount } = useAccount();
-  const t = useTranslations("account.me");
-  const [avatar, setAvatar] = useState(account?.avatar);
+  const { member, updateMember } = useAccount();
+  const t = useTranslations("member.me");
+  const [avatar, setAvatar] = useState(member?.avatar);
   const [isPending, startTransition] = useTransition();
 
   const handleSave = async () => {
     startTransition(async () => {
-      if (account?.id) {
-        const result = await updateAvatar(account.id, avatar ?? "");
+      if (member?.id) {
+        const result = await updateAvatar(member.id, avatar ?? "");
         if (result.success) {
-          updateAccount({ avatar: avatar });
+          updateMember({ avatar: avatar });
           toast.success(result.message);
         } else {
           toast.error(result.error || "updated failed");
@@ -62,8 +62,8 @@ function UserAvatar() {
         </div>
         <div className="relative">
           <AvatarUploader
-            name={account?.name ?? ""}
-            value={account?.avatar ?? ""}
+            name={member?.name ?? ""}
+            value={member?.avatar ?? ""}
             onUploadComplete={(file) => {
               console.log("file: ", file);
               setAvatar(file.url);
@@ -72,9 +72,9 @@ function UserAvatar() {
               setAvatar("");
             }}
           />
-          {account?.name && (
+          {member?.name && (
             <div className="absolute bottom-0 right-0 w-8 h-8 text-center text-[20px] rounded-sm bg-primary/80">
-              {account.name.toUpperCase().slice(0, 1)}
+              {member.name.toUpperCase().slice(0, 1)}
             </div>
           )}
         </div>
@@ -94,17 +94,17 @@ function UserAvatar() {
 }
 
 function Nickname() {
-  const { account, updateAccount } = useAccount();
-  const t = useTranslations("account.me");
-  const [nickname, setNickname] = useState(account?.name || "");
+  const { member, updateMember } = useAccount();
+  const t = useTranslations("member.me");
+  const [nickname, setNickname] = useState(member?.name || "");
   const [isPending, startTransition] = useTransition();
 
   const handleSave = async () => {
     startTransition(async () => {
-      if (account?.id) {
-        const result = await updateNickname(account.id, nickname.trim());
+      if (member?.id) {
+        const result = await updateNickname(member.id, nickname.trim());
         if (result.success) {
-          updateAccount({ name: nickname.trim() });
+          updateMember({ name: nickname.trim() });
           toast.success(result.message);
         } else {
           toast.error(result.error || "updated failed");
@@ -145,7 +145,7 @@ function Nickname() {
         <ActionButton
           loading={isPending}
           onClick={handleSave}
-          disabled={isPending || !nickname.trim() || nickname === account?.name}
+          disabled={isPending || !nickname.trim() || nickname === member?.name}
         >
           {t("common.save")}
         </ActionButton>
@@ -155,8 +155,8 @@ function Nickname() {
 }
 
 function Email() {
-  const { account } = useAccount();
-  const t = useTranslations("account.me");
+  const { member } = useAccount();
+  const t = useTranslations("member.me");
   return (
     <Card x-chunk="dashboard-06-chunk-2">
       <CardHeader>
@@ -165,7 +165,7 @@ function Email() {
       </CardHeader>
       <CardContent>
         <form className="flex flex-col gap-4">
-          <Input readOnly placeholder="" defaultValue={account?.email} />
+          <Input readOnly placeholder="" defaultValue={member?.email} />
         </form>
       </CardContent>
       {/* <CardFooter className="flex justify-between border-t px-6 py-4 text-sm text-muted-foreground">
@@ -178,8 +178,8 @@ function Email() {
 
 function UserId() {
   const { site } = useSite();
-  const { account } = useAccount();
-  const t = useTranslations("account.me");
+  const { member } = useAccount();
+  const t = useTranslations("member.me");
   return (
     <Card x-chunk="dashboard-08-chunk-2">
       <CardHeader>
@@ -191,7 +191,7 @@ function UserId() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Input placeholder="" defaultValue={account?.id} readOnly />
+        <Input placeholder="" defaultValue={member?.id} readOnly />
       </CardContent>
       <CardFooter className="flex justify-between border-t px-6 py-4 text-sm text-muted-foreground">
         {t("userId.footer")}
@@ -201,8 +201,8 @@ function UserId() {
 }
 
 function _PhoneNumber() {
-  // const { account } = useAccount();
-  const _t = useTranslations("account.me");
+  // const { member } = useAccount();
+  const _t = useTranslations("member.me");
   return (
     <Card x-chunk="dashboard-07-chunk-2">
       <CardHeader>
@@ -225,7 +225,7 @@ function _PhoneNumber() {
 }
 
 function Appearance() {
-  const t = useTranslations("account.me");
+  const t = useTranslations("member.me");
   const { setTheme, theme } = useTheme();
   const [currentTheme, setCurrentTheme] = useState<string>();
 
@@ -395,7 +395,7 @@ function Appearance() {
 }
 
 function _DeleteAccount() {
-  const t = useTranslations("account.me");
+  const t = useTranslations("member.me");
   return (
     <Card x-chunk="dashboard-09-chunk-2" className="border-destructive/15 pb-0">
       <CardHeader>

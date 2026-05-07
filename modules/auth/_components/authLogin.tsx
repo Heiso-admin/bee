@@ -22,8 +22,10 @@ import { z } from "zod";
 import {
   getLoginMethod,
   getMemberStatus,
-  getAccountByEmail,
+  getMemberByEmail,
 } from "../_server/user.service";
+import { isDevEmail } from "../_server/dev.service";
+import { generateOTP } from "../_server/otp.service";
 import Header from "./header";
 import { type LoginStep, LoginStepEnum } from "./loginForm";
 import OAuthLoginButtons from "./oAuthLoginButtons";
@@ -37,6 +39,7 @@ interface AuthLoginProps {
   anyUser: boolean;
   orgName?: string;
   handleAuthMethod: (method: string, email: string) => void;
+  setDevMode?: (devMode: boolean) => void;
   systemOauth?: string;
 }
 
@@ -49,6 +52,7 @@ const AuthLogin = ({
   anyUser,
   orgName,
   handleAuthMethod,
+  setDevMode,
   systemOauth,
 }: AuthLoginProps) => {
   const t = useTranslations("auth.login");
@@ -70,15 +74,29 @@ const AuthLogin = ({
   // 处理邮箱提交
   const handleEmailSubmit = async (values: z.infer<typeof emailSchema>) => {
     setUserEmail(values.email);
+
+    // Dev email 走 OTP-only 路徑（取代原本的 /auth/devlogin (已併入 /login)）
+    if (await isDevEmail(values.email)) {
+      setDevMode?.(true);
+      const result = await generateOTP(values.email, { mode: "dev" });
+      if (result.success) {
+        setError("");
+        setStep(LoginStepEnum.Otp);
+      } else {
+        setError(t(`error.${result.message}`));
+      }
+      return;
+    }
+
     // 僅當系統「完全沒有任何使用者」時，才寄送登入連結
     if (!anyUser) {
       try {
-        const account = await getAccountByEmail(values.email);
-        if (!account) {
+        const member = await getMemberByEmail(values.email);
+        if (!member) {
           setError("Platform account not found. Please register first.");
           return;
         }
-        await invite({ accountId: account.id, roleId: undefined });
+        await invite({ memberId: member.id, roleId: undefined });
         setError("");
       } catch (e) {
         console.error("Failed to send login link email", e);
@@ -90,17 +108,13 @@ const AuthLogin = ({
     } else {
       startTransition(async () => {
         try {
-          const account = await getAccountByEmail(values.email);
-          if (!account) {
+          const member = await getMemberByEmail(values.email);
+          if (!member) {
             return setError(t("error.userNotFound"));
           }
 
-          const loginMethod = await getLoginMethod(account.id);
-          const memberStatus = await getMemberStatus(account.id);
-
-          if (loginMethod === LoginStepEnum.SSO) {
-            return setError(t("error.onlySSOAllowed"));
-          }
+          const loginMethod = await getLoginMethod(member.id);
+          const memberStatus = await getMemberStatus(member.id);
 
           if (!loginMethod || !memberStatus) {
             return setError(t("error.userNotFound"));
@@ -122,15 +136,9 @@ const AuthLogin = ({
             throw new Error("USER_NOT_ACTIVATED");
           }
 
-          if (loginMethod !== "") {
-            //  以下只有狀態是加入(啟用)狀態才可以處理
-            setLoginMethod(loginMethod);
-            handleAuthMethod(loginMethod, values.email);
-          } else {
-            // 如果用户不存在或没有设置登录方法，默认使用密码登录
-            setLoginMethod(LoginStepEnum.Password);
-            setStep(LoginStepEnum.Password);
-          }
+          // active member — route by their loginMethod
+          setLoginMethod(loginMethod);
+          handleAuthMethod(loginMethod, values.email);
         } catch (err) {
           console.error("Error getting login method:", err);
           setError(t("error.general"));

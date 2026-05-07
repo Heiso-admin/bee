@@ -1,6 +1,6 @@
 "use client";
 
-import type { TAccount } from "@heiso-io/bee/lib/db/schema";
+import type { TMember } from "@heiso-io/bee/lib/db/schema";
 import { useSession } from "next-auth/react";
 import { createContext, useContext, useEffect, useState } from "react";
 
@@ -10,38 +10,37 @@ interface Membership {
   role: {
     id: string;
     name: string;
-    fullAccess: boolean;
   } | null;
 }
 
 interface AccountContextType {
-  account: Partial<TAccount> | null;
+  member: Partial<TMember> | null;
   kind: "dev" | "member";
   membership: Membership[] | null;
   isLoading: boolean;
   error: Error | null;
-  updateAccount: (account: Partial<TAccount>) => void;
+  updateMember: (member: Partial<TMember>) => void;
 }
 
 const AccountContext = createContext<AccountContextType>({
-  account: null,
+  member: null,
   kind: "member",
   membership: null,
   isLoading: false,
   error: null,
-  updateAccount: () => {},
+  updateMember: () => {},
 });
 
 export function AccountProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
-  const [account, setAccount] = useState<Partial<TAccount> | null>(null);
+  const [member, setMember] = useState<Partial<TMember> | null>(null);
   const [kind, setKind] = useState<"dev" | "member">("member");
   const [membership, setMembership] = useState<Membership[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    async function fetchAccount() {
+    async function fetchMember() {
       try {
         const userId = session?.user?.id;
         const userEmail = session?.user?.email ?? "";
@@ -50,26 +49,23 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
         setIsLoading(true);
 
-        // 改用 API 路由避免在 Client 端匯入 server/db 導致打包錯誤
         const res = await fetch("/api/account/me", {
           method: "GET",
           cache: "no-store",
         });
 
         if (!res.ok) {
-          throw new Error(`Failed to fetch account: ${res.status}`);
+          throw new Error(`Failed to fetch member: ${res.status}`);
         }
         const data = await res.json();
 
         if (data) {
-          const { kind: dataKind, developer, membership: myMembership, ...account } = data;
-          setAccount(account);
-          // accept either new `kind` or legacy `developer` boolean from /api/account/me
+          const { kind: dataKind, developer, membership: myMembership, ...rest } = data;
+          setMember(rest);
           setKind(dataKind ?? (developer ? "dev" : "member"));
           setMembership(myMembership);
         } else {
-          // No matching local account found
-          setAccount(null);
+          setMember(null);
           setKind("member");
           setMembership(null);
         }
@@ -80,22 +76,22 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    fetchAccount();
+    fetchMember();
   }, [session?.user?.id, session?.user?.email]);
 
-  const updateAccount = (updatedAccount: Partial<TAccount>) => {
-    setAccount(updatedAccount);
+  const updateMember = (updated: Partial<TMember>) => {
+    setMember(updated);
   };
 
   return (
     <AccountContext.Provider
       value={{
-        account,
+        member,
         membership,
         kind,
         isLoading,
         error,
-        updateAccount,
+        updateMember,
       }}
     >
       {children}

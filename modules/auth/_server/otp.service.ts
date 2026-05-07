@@ -4,14 +4,14 @@ import { render } from "@react-email/components";
 import config, { settings } from "@heiso-io/bee/config";
 import TwoFactorEmail from "@heiso-io/bee/emails/2fa";
 import { db } from "@heiso-io/bee/lib/db";
-import { accounts, user2faCode } from "@heiso-io/bee/lib/db/schema";
+import { members, member2faCode } from "@heiso-io/bee/lib/db/schema";
 import { sendEmail } from "@heiso-io/bee/lib/email";
 import { hashPassword } from "@heiso-io/bee/lib/hash";
 import { generateId } from "@heiso-io/bee/lib/id-generator";
 import { consumeRateLimit } from "@heiso-io/bee/lib/rate-limit";
 import { ALLOWED_DEV_EMAILS } from "@heiso-io/bee/modules/auth/auth.config";
 import { and, eq, gt, lt } from "drizzle-orm";
-import { getAccountByEmail, getAccountWithPasswordByEmail, getMember } from "./user.service";
+import { getMemberByEmail, getAccountWithPasswordByEmail, getMember } from "./user.service";
 
 export type OTPMode = "regular" | "dev";
 
@@ -29,7 +29,7 @@ export interface OTPGenerationResult {
 export interface OTPVerificationResult {
   success: boolean;
   message: string;
-  accountId?: string;
+  memberId?: string;
 }
 
 function generateOTPCode(): string {
@@ -44,8 +44,8 @@ async function ensureDevAccount(email: string) {
   const randomPassword = await hashPassword(generateId(undefined, 32));
   const displayName = email === "pm@heiso.io" ? "Core PM" : "Core Dev";
 
-  const [account] = await db
-    .insert(accounts)
+  const [member] = await db
+    .insert(members)
     .values({
       email,
       name: displayName,
@@ -56,7 +56,7 @@ async function ensureDevAccount(email: string) {
     })
     .returning();
 
-  return account;
+  return member;
 }
 
 /**
@@ -86,29 +86,29 @@ export async function generateOTP(
       }
     }
 
-    let account =
-      mode === "dev" ? await ensureDevAccount(email) : await getAccountByEmail(email);
-    if (!account) {
+    let member =
+      mode === "dev" ? await ensureDevAccount(email) : await getMemberByEmail(email);
+    if (!member) {
       return { success: false, message: "userNotFound" };
     }
 
     if (mode === "regular") {
-      const member = await getMember(account.id);
-      if (!member) return { success: false, message: "userNotFound" };
-      if (member.status !== "active") return { success: false, message: "notActive" };
+      const memberDetail = await getMember(member.id);
+      if (!memberDetail) return { success: false, message: "userNotFound" };
+      if (memberDetail.status !== "active") return { success: false, message: "notActive" };
     }
-
-    await cleanupExpiredOTPs(account.id);
 
     const code = generateOTPCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await db.insert(user2faCode).values({
-      accountId: account.id,
-      code,
-      used: false,
-      expiresAt,
-    });
+    // One-row-per-member：upsert 直接覆蓋舊 code，舊 magic link 自動失效。
+    await db
+      .insert(member2faCode)
+      .values({ memberId: member.id, code, expiresAt })
+      .onConflictDoUpdate({
+        target: member2faCode.memberId,
+        set: { code, expiresAt, createdAt: new Date() },
+      });
 
     const { NOTIFY_EMAIL, BASE_HOST } = await settings();
     const baseHost =
@@ -117,13 +117,19 @@ export async function generateOTP(
       process.env.AUTH_URL ||
       "http://localhost:3000";
 
-    const modeQS = mode === "dev" ? "&mode=dev" : "";
-    const magicLink = `${baseHost}/auth/login/2steps?email=${encodeURIComponent(account.email as string)}&code=${code}${modeQS}`;
+    const { encodeMagicToken } = await import("@heiso-io/bee/lib/magic-token");
+    const magicToken = encodeMagicToken({
+      email: member.email as string,
+      code,
+      mode: mode as "regular" | "dev",
+      exp: expiresAt.getTime(),
+    });
+    const magicLink = `${baseHost}/auth/login/2steps?t=${magicToken}`;
 
     const emailHtml = await render(
       TwoFactorEmail({
         code,
-        username: account.name ?? "",
+        username: member.name ?? "",
         expiresInMinutes: 10,
         magicLink,
         orgName: config.site.organization,
@@ -133,7 +139,7 @@ export async function generateOTP(
     const linkPresent = emailHtml.includes(escapedLink) || emailHtml.includes(magicLink);
     const buttonTextPresent = emailHtml.includes("Use one-click sign-in");
     console.log(
-      `[otp] ${mode} sent to ${account.email} — html len ${emailHtml.length} — link in html? ${linkPresent} — button text? ${buttonTextPresent}`,
+      `[otp] ${mode} sent to ${member.email} — html len ${emailHtml.length} — link in html? ${linkPresent} — button text? ${buttonTextPresent}`,
     );
     if (process.env.NODE_ENV !== "production") {
       const fs = await import("node:fs");
@@ -143,7 +149,7 @@ export async function generateOTP(
     const subjectPrefix = mode === "dev" ? "[DevLogin] " : "";
     await sendEmail({
       from: (NOTIFY_EMAIL as string) || "noreply@heiso.com",
-      to: [account.email as string],
+      to: [member.email as string],
       subject: `${subjectPrefix}Sign in to ${config.site.organization}`,
       body: emailHtml,
     });
@@ -170,17 +176,16 @@ export async function verifyOTP(
       return { success: false, message: "accessDenied" };
     }
 
-    const account = await getAccountByEmail(email);
-    if (!account) {
+    const member = await getMemberByEmail(email);
+    if (!member) {
       return { success: false, message: "userNotFound" };
     }
 
-    const otpRecord = await db.query.user2faCode.findFirst({
+    const otpRecord = await db.query.member2faCode.findFirst({
       where: and(
-        eq(user2faCode.accountId, account.id),
-        eq(user2faCode.code, code),
-        eq(user2faCode.used, false),
-        gt(user2faCode.expiresAt, new Date()),
+        eq(member2faCode.memberId, member.id),
+        eq(member2faCode.code, code),
+        gt(member2faCode.expiresAt, new Date()),
       ),
     });
 
@@ -188,15 +193,13 @@ export async function verifyOTP(
       return { success: false, message: "invalidCode" };
     }
 
-    await db
-      .update(user2faCode)
-      .set({ used: true })
-      .where(eq(user2faCode.id, otpRecord.id));
+    // 一次性：verify 成功直接 DELETE（沒有 used flag）
+    await db.delete(member2faCode).where(eq(member2faCode.id, otpRecord.id));
 
     return {
       success: true,
       message: "OTP verified successfully",
-      accountId: account.id,
+      memberId: member.id,
     };
   } catch (error) {
     console.error("[otp] verify failed:", error);
@@ -204,15 +207,15 @@ export async function verifyOTP(
   }
 }
 
-export async function cleanupExpiredOTPs(accountId?: string): Promise<void> {
+export async function cleanupExpiredOTPs(memberId?: string): Promise<void> {
   try {
     const now = new Date();
-    if (accountId) {
+    if (memberId) {
       await db
-        .delete(user2faCode)
-        .where(and(eq(user2faCode.accountId, accountId), lt(user2faCode.expiresAt, now)));
+        .delete(member2faCode)
+        .where(and(eq(member2faCode.memberId, memberId), lt(member2faCode.expiresAt, now)));
     } else {
-      await db.delete(user2faCode).where(lt(user2faCode.expiresAt, now));
+      await db.delete(member2faCode).where(lt(member2faCode.expiresAt, now));
     }
   } catch (error) {
     console.error("[otp] cleanup failed:", error);
@@ -221,14 +224,13 @@ export async function cleanupExpiredOTPs(accountId?: string): Promise<void> {
 
 export async function hasValidOTP(email: string): Promise<boolean> {
   try {
-    const account = await getAccountByEmail(email);
-    if (!account) return false;
+    const member = await getMemberByEmail(email);
+    if (!member) return false;
 
-    const validOTP = await db.query.user2faCode.findFirst({
+    const validOTP = await db.query.member2faCode.findFirst({
       where: and(
-        eq(user2faCode.accountId, account.id),
-        eq(user2faCode.used, false),
-        gt(user2faCode.expiresAt, new Date()),
+        eq(member2faCode.memberId, member.id),
+        gt(member2faCode.expiresAt, new Date()),
       ),
     });
 
@@ -241,16 +243,14 @@ export async function hasValidOTP(email: string): Promise<boolean> {
 
 export async function getOTPStatus(email: string) {
   try {
-    const account = await getAccountByEmail(email);
-    if (!account) return null;
+    const member = await getMemberByEmail(email);
+    if (!member) return null;
 
-    const validOTP = await db.query.user2faCode.findFirst({
+    const validOTP = await db.query.member2faCode.findFirst({
       where: and(
-        eq(user2faCode.accountId, account.id),
-        eq(user2faCode.used, false),
-        gt(user2faCode.expiresAt, new Date()),
+        eq(member2faCode.memberId, member.id),
+        gt(member2faCode.expiresAt, new Date()),
       ),
-      orderBy: (table, { desc }) => [desc(table.createdAt)],
     });
 
     return {

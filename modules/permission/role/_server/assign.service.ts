@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@heiso-io/bee/lib/db";
-import { roleMenus, rolePermissions } from "@heiso-io/bee/lib/db/schema";
+import { roleMenus, roleApiPermissions } from "@heiso-io/bee/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -23,7 +23,7 @@ async function assignMenus({
       );
     }
   });
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
 }
 
 async function assignPermissions({
@@ -34,17 +34,17 @@ async function assignPermissions({
   permissions: string[];
 }) {
   await db.transaction(async (tx) => {
-    await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+    await tx.delete(roleApiPermissions).where(eq(roleApiPermissions.roleId, roleId));
     if (permissions.length > 0) {
-      await tx.insert(rolePermissions).values(
-        permissions.map((permissionId) => ({
+      await tx.insert(roleApiPermissions).values(
+        permissions.map((apiPermissionId) => ({
           roleId,
-          permissionId,
+          apiPermissionId,
         })),
       );
     }
   });
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
 }
 
 export { assignMenus, assignPermissions };

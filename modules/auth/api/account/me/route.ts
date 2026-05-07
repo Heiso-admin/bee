@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { auth } from "@heiso-io/bee/modules/auth/auth.config";
-import { getAccount, getAccountByEmail } from "@heiso-io/bee/server/user.service";
+import { getAccount, getMemberByEmail } from "@heiso-io/bee/server/user.service";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -31,7 +31,6 @@ export async function GET() {
           customRole: {
             id: 'admin',
             name: 'Admin',
-            fullAccess: true,
           }
         }
       });
@@ -40,7 +39,7 @@ export async function GET() {
     let data = userId ? await getAccount(userId) : null;
 
     if (!data && email) {
-      data = await getAccountByEmail(email);
+      data = await getMemberByEmail(email);
     }
 
     return NextResponse.json(data ?? null);

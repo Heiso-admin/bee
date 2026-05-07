@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
+import { db } from "@heiso-io/bee/lib/db";
 import { ApiKeysList } from "./_components/api-keys-list";
 import { CreateApiKeyButton } from "./_components/create-api-key-button";
 import { getApiKeysList } from "./_server/api-keys.service";
@@ -36,6 +37,11 @@ function ApiKeysLoadingSkeleton() {
 
 export default async function ApiKeysPage() {
   const t = await getTranslations("apiKeys");
+  const roles = await db.query.roles.findMany({
+    columns: { id: true, name: true },
+    where: (t, { isNull }) => isNull(t.deletedAt),
+    orderBy: (t, { asc }) => [asc(t.name)],
+  });
 
   return (
     <div className="mx-auto max-w-6xl py-6 space-y-6 px-6">
@@ -44,7 +50,7 @@ export default async function ApiKeysPage() {
           <h1 className="text-2xl font-semibold text-gray-900">{t("title")}</h1>
 
         </div>
-        <CreateApiKeyButton />
+        <CreateApiKeyButton availableRoles={roles} />
       </div>
 
       <Suspense fallback={<ApiKeysLoadingSkeleton />}>

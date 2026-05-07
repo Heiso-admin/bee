@@ -73,7 +73,7 @@ export const ConfirmResetPassword = ({
               <DialogTitle>{t("confirm.title")}</DialogTitle>
               <DialogDescription style={{ whiteSpace: "pre-line" }}>
                 {t("confirm.description", {
-                  userName: member.account?.name || member.account?.email?.split("@")[0] || "Unknown",
+                  userName: member.profile?.name || member.profile?.email?.split("@")[0] || "Unknown",
                 })}
               </DialogDescription>
             </DialogHeader>
@@ -98,7 +98,7 @@ export const ConfirmResetPassword = ({
             <div className="space-y-4">
               <MemberUser
                 member={member}
-                isYou={member.accountId === sessionUserId}
+                isYou={member.memberId === sessionUserId}
               />
               <div className="text-sm">{t("result.content")}</div>
               <div className="rounded-md border bg-muted px-4 py-3 text-xl font-medium select-all text-center relative">

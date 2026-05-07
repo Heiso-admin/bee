@@ -29,7 +29,7 @@ export default function RoleSelect() {
         </Card>
       </Link>
 
-      <Link href="/portal/core/staff-center" className="block">
+      <Link href="/portal/dev-center" className="block">
         <Card className="group flex flex-row cursor-pointer items-center justify-between p-6 transition-colors hover:bg-muted/50">
           <div className="flex items-center gap-4">
             <div className="rounded-full bg-purple-100 p-2">

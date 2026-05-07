@@ -9,9 +9,10 @@ import { CreateApiKeyDialog } from "./create-api-key-dialog";
 
 interface CreateApiKeyButtonProps {
   onSuccess?: (apiKey: TPublicApiKey) => void;
+  availableRoles: { id: string; name: string }[];
 }
 
-export function CreateApiKeyButton({ onSuccess }: CreateApiKeyButtonProps) {
+export function CreateApiKeyButton({ onSuccess, availableRoles }: CreateApiKeyButtonProps) {
   const t = useTranslations("apiKeys");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -31,6 +32,7 @@ export function CreateApiKeyButton({ onSuccess }: CreateApiKeyButtonProps) {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSuccess={handleSuccess}
+        availableRoles={availableRoles}
       />
     </>
   );

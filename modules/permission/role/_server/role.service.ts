@@ -3,7 +3,7 @@
 import { db } from "@heiso-io/bee/lib/db";
 import type {
   TMenu,
-  TPermission,
+  TApiPermission,
   TRole,
   TRoleInsert,
   TRoleUpdate,
@@ -16,8 +16,8 @@ export type Role = TRole & {
   menus: {
     menus: TMenu;
   }[];
-  permissions: {
-    permission: TPermission;
+  apiPermissions: {
+    apiPermission: TApiPermission;
   }[];
 };
 
@@ -29,9 +29,9 @@ async function getRoles(): Promise<Role[]> {
           menus: true,
         },
       },
-      permissions: {
+      apiPermissions: {
         with: {
-          permission: true,
+          apiPermission: true,
         },
       },
     },
@@ -39,12 +39,12 @@ async function getRoles(): Promise<Role[]> {
     orderBy: (t, { asc }) => [asc(t.createdAt)],
   });
 
-  return result;
+  return result as Role[];
 }
 
 async function createRole(data: TRoleInsert) {
   const result = await db.insert(roles).values(data);
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
   return result;
 }
 
@@ -54,7 +54,7 @@ async function updateRole(id: string, data: TRoleUpdate) {
     .set({ ...data, updatedAt: new Date() })
     .where(eq(roles.id, id));
 
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
   return result;
 }
 
@@ -67,7 +67,7 @@ async function deleteRole({ id }: { id: string }) {
     })
     .where(and(eq(roles.id, id), isNull(roles.deletedAt)));
 
-  revalidatePath("/portal/core/account/role", "page");
+  revalidatePath("/portal/account/role", "page");
   return result;
 }
 

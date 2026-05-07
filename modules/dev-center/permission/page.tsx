@@ -4,14 +4,14 @@ import { Skeleton } from "@heiso-io/bee/components/ui/skeleton";
 import { getMenus } from "@heiso-io/bee/modules/dev-center/permission/_server/menu.service";
 import {
   getPermissions,
-  groupPermissionsByMenu,
+  groupPermissionsByResource,
 } from "@heiso-io/bee/modules/dev-center/permission/_server/permission.service";
 import { PermissionListContent } from "./_components/permission-list-content";
 
 export default async function PermissionPage() {
   const menus = await getMenus();
   const dbPermissions = await getPermissions();
-  const permissionGroups = await groupPermissionsByMenu(
+  const permissionGroups = await groupPermissionsByResource(
     menus,
     [],
     dbPermissions,

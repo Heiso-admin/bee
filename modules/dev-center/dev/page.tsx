@@ -15,7 +15,7 @@ export default async function DevPage() {
 
         {ALLOWED_DEV_EMAILS.length === 0 ? (
           <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-            目前沒有 dev — 所有人都不能走 /devlogin
+            目前沒有 dev — 所有人都不能走 /auth/login
           </div>
         ) : (
           <ul className="rounded-md border divide-y bg-card">

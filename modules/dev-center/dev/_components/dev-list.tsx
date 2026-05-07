@@ -106,7 +106,7 @@ export function StaffList({ data }: { data: Staff[] }) {
                   className="text-xs text-destructive"
                   onClick={() => {
                     startRemoveTransition(async () => {
-                      await removeStaff({ id: row.original.accountId });
+                      await removeStaff({ id: row.original.memberId });
                     });
                   }}
                 >

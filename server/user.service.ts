@@ -1,24 +1,24 @@
 "use server";
 
 import {
-  getAccountByEmail as getAccountByEmailAdapter,
-  getAccountById,
-  updateAccount,
-} from "@heiso-io/bee/lib/accounts/account-adapter";
+  getMemberByEmail as getAccountByEmailAdapter,
+  getMemberById,
+  updateMember,
+} from "@heiso-io/bee/lib/members/member-adapter";
 import { db } from "@heiso-io/bee/lib/db";
-import type { TAccount } from "@heiso-io/bee/lib/db/schema";
+import type { TMember } from "@heiso-io/bee/lib/db/schema";
 
 // 包成 async function（"use server" 不允許同步 re-export，否則 build 時會被當 server action wrapper、runtime crash）
-export async function getAccountByEmail(email: string) {
+export async function getMemberByEmail(email: string) {
   return getAccountByEmailAdapter(email);
 }
 
 /**
- * Get all accounts
+ * Get all members
  */
 export async function getUsers() {
 
-  return await db.query.accounts.findMany({
+  return await db.query.members.findMany({
     columns: {
       id: true,
       name: true,
@@ -33,16 +33,16 @@ export async function getUsers() {
 }
 
 export async function getUserById(id: string) {
-  return await getAccountById(id);
+  return await getMemberById(id);
 }
 
 /**
  * 透過邀請 token 取得邀請資訊
- * 統一使用 accounts 表
+ * 統一使用 members 表
  */
 export async function getInvitation(token: string) {
 
-  const account = await db.query.accounts.findFirst({
+  const member = await db.query.members.findFirst({
     columns: {
       id: true,
       email: true,
@@ -56,7 +56,7 @@ export async function getInvitation(token: string) {
       and(eq(table.inviteToken, token), isNull(table.deletedAt)),
   });
 
-  if (!account) {
+  if (!member) {
     return {
       invitation: null,
       user: null,
@@ -65,18 +65,23 @@ export async function getInvitation(token: string) {
 
   return {
     invitation: {
-      id: account.id,
-      accountId: account.id,
-      inviteToken: account.inviteToken,
-      inviteExpiredAt: account.inviteExpiredAt,
-      status: account.status,
+      id: member.id,
+      memberId: member.id,
+      inviteToken: member.inviteToken,
+      inviteExpiredAt: member.inviteExpiredAt,
+      status: member.status,
     },
-    user: account,
+    user: {
+      id: member.id,
+      email: member.email,
+      name: member.name,
+      avatar: member.avatar,
+    },
   };
 }
 
 export async function getAccount(id: string) {
-  return await getAccountById(id);
+  return await getMemberById(id);
 }
 
 export async function getUser(email: string) {
@@ -88,9 +93,9 @@ export async function getUser(email: string) {
 
 
  */
-export async function update(id: string, data: Partial<TAccount>) {
+export async function update(id: string, data: Partial<TMember>) {
   try {
-    await updateAccount(id, data);
+    await updateMember(id, data);
   } catch (error) {
     console.error("Failed to update account:", error);
     throw error;

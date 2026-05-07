@@ -35,7 +35,7 @@ interface MenuTreeProps {
   };
   selectPermission?: {
     selectedItems: string[];
-    onSelectionChange: (permissionId: string, checked: boolean) => void;
+    onSelectionChange: (apiPermissionId: string, checked: boolean) => void;
     disabled?: boolean;
   };
   level?: number;
@@ -63,7 +63,7 @@ interface MenuTreeItemProps {
   };
   selectPermission?: {
     selectedItems: string[];
-    onSelectionChange: (permissionId: string, checked: boolean) => void;
+    onSelectionChange: (apiPermissionId: string, checked: boolean) => void;
     disabled?: boolean;
   };
   level: number;
